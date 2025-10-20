@@ -222,7 +222,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                   <button
                     key={color.class}
                     onClick={() => setSelectedColor(color.class)}
-                    className={`h-12 rounded-lg ${color.class} ${
+                    className={`h-12 rounded-lg ${color.class} cursor-pointer ${
                       selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
                     }`}
                     title={color.name}
@@ -249,7 +249,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                       <button
                         key={icon}
                         onClick={() => setSelectedIcon(icon)}
-                        className={`h-12 rounded-lg border-2 flex items-center justify-center ${
+                        className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${
                           selectedIcon === icon
                             ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
                             : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
@@ -322,7 +322,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                     <button
                       key={color.class}
                       onClick={() => setSelectedColor(color.class)}
-                      className={`h-12 rounded-lg ${color.class} ${
+                      className={`h-12 rounded-lg ${color.class} cursor-pointer ${
                         selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
                       }`}
                       title={color.name}
@@ -349,7 +349,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                         <button
                           key={icon}
                           onClick={() => setSelectedIcon(icon)}
-                          className={`h-12 rounded-lg border-2 flex items-center justify-center ${
+                          className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${
                             selectedIcon === icon
                               ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
                               : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"

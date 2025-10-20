@@ -52,7 +52,7 @@ export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onT
             {/* Logo */}
             <button
               onClick={onNavigateHome}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
             >
               <div className="w-8 h-8 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
                 <Users className="w-5 h-5 text-white" />

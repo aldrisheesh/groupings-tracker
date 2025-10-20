@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Edit2, Trash2, X, Settings, Crown } from "lucide-react";
+import { Users, Edit2, Trash2, X, Crown, UsersRound } from "lucide-react";
 import { Group } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
+import { Textarea } from "./ui/textarea";
 import { toast } from "sonner@2.0.3";
 import {
   AlertDialog,
@@ -27,6 +28,7 @@ interface GroupCardProps {
   onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   isAdmin: boolean;
+  isLocked: boolean;
   highlighted?: boolean;
 }
 
@@ -43,17 +45,20 @@ export function GroupCard({
   onRemoveMember, 
   onDeleteGroup,
   isAdmin,
+  isLocked,
   highlighted
 }: GroupCardProps) {
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [memberName, setMemberName] = useState("");
+  const [batchMemberNames, setBatchMemberNames] = useState("");
   const [editGroupName, setEditGroupName] = useState(group.name);
   const [editMemberLimit, setEditMemberLimit] = useState(group.memberLimit.toString());
 
   const isFull = group.members.length >= group.memberLimit;
 
+  // Single member join (for regular users)
   const handleJoinGroup = () => {
     if (!memberName.trim()) {
       toast.error("Please enter your name");
@@ -71,9 +76,76 @@ export function GroupCard({
     }
 
     onJoinGroup(group.id, memberName.trim());
-    // Success toast removed from here - will be shown in parent component after validation
     setIsJoinDialogOpen(false);
     setMemberName("");
+  };
+
+  // Batch member add (for admin)
+  const handleBatchAddMembers = () => {
+    const names = batchMemberNames
+      .split('\n')
+      .map(name => name.trim())
+      .filter(name => name.length > 0);
+
+    if (names.length === 0) {
+      toast.error("Please enter at least one member name");
+      return;
+    }
+
+    const validNames: string[] = [];
+    const invalidNames: string[] = [];
+    const duplicateNames: string[] = [];
+    
+    names.forEach(name => {
+      // Check format
+      if (!validateNameFormat(name)) {
+        invalidNames.push(name);
+        return;
+      }
+      
+      // Check if already in the group
+      const existsInGroup = group.members.some(m => m.toLowerCase() === name.toLowerCase());
+      // Check if duplicate within the batch itself
+      const existsInBatch = validNames.some(n => n.toLowerCase() === name.toLowerCase());
+      
+      if (existsInGroup || existsInBatch) {
+        duplicateNames.push(name);
+        return;
+      }
+      
+      validNames.push(name);
+    });
+
+    // Check if adding would exceed member limit
+    if (group.members.length + validNames.length > group.memberLimit) {
+      toast.error(`Cannot add ${validNames.length} members. Only ${group.memberLimit - group.members.length} spots available.`);
+      return;
+    }
+
+    // Add all valid members
+    if (validNames.length > 0) {
+      const updatedMembers = [...group.members, ...validNames];
+      onUpdateGroup(group.id, { members: updatedMembers });
+      
+      // Show results
+      const results: string[] = [];
+      results.push(`✓ ${validNames.length} member${validNames.length > 1 ? 's' : ''} added successfully`);
+      if (invalidNames.length > 0) {
+        results.push(`⚠ ${invalidNames.length} invalid format${invalidNames.length > 1 ? 's' : ''}`);
+      }
+      if (duplicateNames.length > 0) {
+        results.push(`⚠ ${duplicateNames.length} duplicate${duplicateNames.length > 1 ? 's' : ''} skipped`);
+      }
+      
+      toast.success(results.join('\n'));
+      setBatchMemberNames("");
+      setIsJoinDialogOpen(false);
+    } else {
+      toast.error("No valid members to add\n" + 
+        (invalidNames.length > 0 ? `Invalid format: ${invalidNames.length}\n` : '') +
+        (duplicateNames.length > 0 ? `Duplicates: ${duplicateNames.length}` : '')
+      );
+    }
   };
 
   const handleUpdateGroup = () => {
@@ -227,14 +299,16 @@ export function GroupCard({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 dark:hover:bg-slate-800"
-                        onClick={() => handleRemoveMember(member)}
-                      >
-                        <X className="w-3 h-3 text-red-600 dark:text-red-400" />
-                      </Button>
+                      {!isLocked && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 dark:hover:bg-slate-800"
+                          onClick={() => handleRemoveMember(member)}
+                        >
+                          <X className="w-3 h-3 text-red-600 dark:text-red-400" />
+                        </Button>
+                      )}
                     </div>
                   </li>
                 );
@@ -247,49 +321,97 @@ export function GroupCard({
             onClick={() => setIsJoinDialogOpen(true)}
             variant="outline"
             className={`w-full ${ 
-              isFull
+              isFull || isLocked
                 ? "border-slate-300 text-slate-400 cursor-not-allowed dark:border-slate-700 dark:text-slate-600"
                 : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
             }`}
-            disabled={isFull}
+            disabled={isFull || (isLocked && !isAdmin)}
           >
-            {isFull ? "Group Full" : "Join Group"}
+            {isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Add Members" : "Join Group"}
           </Button>
         </CardFooter>
       </Card>
 
-      {/* Join Group Dialog */}
+      {/* Join/Add Members Dialog */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
         <DialogContent className="w-[calc(100%-2rem)] mx-4 dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="dark:text-slate-100">Join {group.name}</DialogTitle>
+            <DialogTitle className="dark:text-slate-100">
+              {isAdmin ? `Add Members to ${group.name}` : `Join ${group.name}`}
+            </DialogTitle>
             <DialogDescription className="dark:text-slate-400">
-              Enter your name to join this group.
+              {isAdmin 
+                ? "Add multiple members at once (one per line)"
+                : "Enter your name to join this group."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="member-name">Your Name</Label>
-              <Input
-                id="member-name"
-                value={memberName}
-                onChange={(e) => setMemberName(e.target.value)}
-                placeholder="Last Name, First Name (e.g., Santos, Roi Aldrich)"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleJoinGroup();
-                  }
-                }}
-              />
-              <p className="text-slate-500 dark:text-slate-500">Format: Last Name, First Name</p>
-            </div>
+            {isAdmin ? (
+              // Admin: Batch add with textarea
+              <div className="space-y-2">
+                <Label htmlFor="batch-members">Member Names (One per Line)</Label>
+                <Textarea
+                  id="batch-members"
+                  value={batchMemberNames}
+                  onChange={(e) => setBatchMemberNames(e.target.value)}
+                  placeholder="Santos, Roi Aldrich&#10;Chen, Alice&#10;Smith, Bob&#10;Zhang, Carol"
+                  className="min-h-[200px] font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleBatchAddMembers();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-slate-500 dark:text-slate-500">
+                    Format: Last Name, First Name (one per line)
+                    <span className="block mt-1">Press Ctrl+Enter to add all</span>
+                  </p>
+                  <p className="text-slate-600 dark:text-slate-400">
+                    Available: {group.memberLimit - group.members.length} spots
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // Regular user: Single input
+              <div className="space-y-2">
+                <Label htmlFor="member-name">Your Name</Label>
+                <Input
+                  id="member-name"
+                  value={memberName}
+                  onChange={(e) => setMemberName(e.target.value)}
+                  placeholder="Last Name, First Name (e.g., Santos, Roi Aldrich)"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleJoinGroup();
+                    }
+                  }}
+                />
+                <p className="text-slate-500 dark:text-slate-500">Format: Last Name, First Name</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsJoinDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setIsJoinDialogOpen(false);
+              setMemberName("");
+              setBatchMemberNames("");
+            }}>
               Cancel
             </Button>
-            <Button onClick={handleJoinGroup} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-              Join Group
+            <Button 
+              onClick={isAdmin ? handleBatchAddMembers : handleJoinGroup} 
+              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            >
+              {isAdmin ? (
+                <>
+                  <UsersRound className="w-4 h-4 mr-2" />
+                  Add Members
+                </>
+              ) : (
+                "Join Group"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

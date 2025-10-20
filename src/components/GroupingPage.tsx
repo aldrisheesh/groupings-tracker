@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Lock, Unlock } from "lucide-react";
 import { Subject, Grouping, Group, Student } from "../App";
 import { GroupCard } from "./GroupCard";
 import { CreateGroupForm } from "./CreateGroupForm";
 import { StudentAvailability } from "./StudentAvailability";
 import { Button } from "./ui/button";
 import { toast } from "sonner@2.0.3";
+import { Badge } from "./ui/badge";
 
 interface GroupingPageProps {
   subject: Subject;
@@ -19,6 +20,7 @@ interface GroupingPageProps {
   onDeleteGroup: (groupId: string) => void;
   onBack: () => void;
   isAdmin: boolean;
+  onToggleGroupingLock: (groupingId: string) => void;
 }
 
 export function GroupingPage({
@@ -33,6 +35,7 @@ export function GroupingPage({
   onDeleteGroup,
   onBack,
   isAdmin,
+  onToggleGroupingLock,
 }: GroupingPageProps) {
   const [highlightedGroupId, setHighlightedGroupId] = useState<string | null>(null);
 
@@ -97,10 +100,39 @@ export function GroupingPage({
         </Button>
 
         <div className="space-y-2">
-          <div className="flex items-center gap-3 text-slate-500 dark:text-slate-500">
+          <div className="flex items-center gap-3 text-slate-500 dark:text-slate-500 flex-wrap">
             <span>{subject.name}</span>
             <span>—</span>
             <span>{grouping.title}</span>
+            {grouping.locked && (
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Locked
+              </Badge>
+            )}
+            {isAdmin && (
+              <Button
+                onClick={() => {
+                  onToggleGroupingLock(grouping.id);
+                  toast.success(grouping.locked ? "Grouping unlocked" : "Grouping locked");
+                }}
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+              >
+                {grouping.locked ? (
+                  <>
+                    <Unlock className="w-4 h-4 mr-2" />
+                    Unlock Grouping
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Lock Grouping
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           <StudentAvailability students={students} groups={groups} />
         </div>
@@ -119,6 +151,7 @@ export function GroupingPage({
                 onRemoveMember={onRemoveMember}
                 onDeleteGroup={onDeleteGroup}
                 isAdmin={isAdmin}
+                isLocked={grouping.locked || false}
                 highlighted={highlightedGroupId === group.id}
               />
             ))}

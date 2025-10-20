@@ -1,5 +1,0 @@
-{
-    "buildCommand": "echo 'Using Figma Make build system'",
-    "outputDirectory": ".",
-    "installCommand": "echo 'No dependencies to install'"
-}  

@@ -135,6 +135,7 @@ function App() {
           ? { ...s, students: [...s.students, newStudent] }
           : s
       ));
+      // Toast is now handled in StudentManagement component
     } else {
       toast.error('Failed to add student');
     }
@@ -368,19 +369,22 @@ function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Navbar
         isAdmin={isAdmin}
-        onAdminToggle={() => setIsAdmin(!isAdmin)}
+        onToggleAdmin={(value) => setIsAdmin(value)}
         isDarkMode={isDarkMode}
-        onDarkModeToggle={() => setIsDarkMode(!isDarkMode)}
+        onToggleDarkMode={(value) => setIsDarkMode(value)}
         onNavigateHome={() => setCurrentPage({ type: "home" })}
       />
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         {currentPage.type === "home" && (
           <SubjectsPage
             subjects={subjects}
+            onNavigate={(page) => setCurrentPage(page)}
             onCreateSubject={handleCreateSubject}
             onUpdateSubject={handleUpdateSubject}
             onDeleteSubject={handleDeleteSubject}
-            onSelectSubject={(subjectId) => setCurrentPage({ type: "subject", subjectId })}
+            onAddStudent={handleAddStudent}
+            onBatchAddStudents={handleBatchAddStudents}
+            onRemoveStudent={handleRemoveStudent}
             isAdmin={isAdmin}
           />
         )}
@@ -397,14 +401,8 @@ function App() {
             <SubjectPage
               subject={subject}
               groupings={subjectGroupings}
-              onAddStudent={handleAddStudent}
-              onBatchAddStudents={handleBatchAddStudents}
-              onRemoveStudent={handleRemoveStudent}
+              onNavigate={(page) => setCurrentPage(page)}
               onCreateGrouping={handleCreateGrouping}
-              onDeleteGrouping={handleDeleteGrouping}
-              onSelectGrouping={(groupingId) => 
-                setCurrentPage({ type: "grouping", subjectId: currentPage.subjectId, groupingId })
-              }
               onBack={() => setCurrentPage({ type: "home" })}
               isAdmin={isAdmin}
             />
@@ -438,7 +436,7 @@ function App() {
           );
         })()}
       </main>
-      <Toaster position="top-right" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

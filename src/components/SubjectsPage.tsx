@@ -6,12 +6,15 @@ interface SubjectsPageProps {
   subjects: Subject[];
   onNavigate: (page: Page) => void;
   isAdmin: boolean;
-  onCreateSubject: (subject: Subject) => void;
-  onUpdateSubject: (id: string, updated: Partial<Subject>) => void;
+  onCreateSubject: (name: string, color: string, icon: string) => void;
+  onUpdateSubject: (id: string, updates: { name?: string; color?: string; icon?: string }) => void;
   onDeleteSubject: (id: string) => void;
+  onAddStudent: (subjectId: string, studentName: string) => void;
+  onBatchAddStudents: (subjectId: string, studentNames: string[]) => void;
+  onRemoveStudent: (subjectId: string, studentId: string) => void;
 }
 
-export function SubjectsPage({ subjects, onNavigate, isAdmin, onCreateSubject, onUpdateSubject, onDeleteSubject }: SubjectsPageProps) {
+export function SubjectsPage({ subjects, onNavigate, isAdmin, onCreateSubject, onUpdateSubject, onDeleteSubject, onAddStudent, onBatchAddStudents, onRemoveStudent }: SubjectsPageProps) {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
@@ -25,6 +28,9 @@ export function SubjectsPage({ subjects, onNavigate, isAdmin, onCreateSubject, o
           onCreateSubject={onCreateSubject}
           onUpdateSubject={onUpdateSubject}
           onDeleteSubject={onDeleteSubject}
+          onAddStudent={onAddStudent}
+          onBatchAddStudents={onBatchAddStudents}
+          onRemoveStudent={onRemoveStudent}
         />
       )}
 

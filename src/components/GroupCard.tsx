@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Users, Edit2, Trash2, X, Crown, UsersRound } from "lucide-react";
-import { Group } from "../App";
+import { Group, Student } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 
 interface GroupCardProps {
   group: Group;
+  students: Student[];
   onJoinGroup: (groupId: string, memberName: string) => void;
   onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
   onRemoveMember: (groupId: string, memberName: string) => void;
@@ -38,8 +39,30 @@ const validateNameFormat = (name: string): boolean => {
   return regex.test(name.trim());
 };
 
+// Helper function for fuzzy matching enrolled students
+// Matches if last names match and input first name is contained in enrolled first name
+const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
+  const inputParts = inputName.trim().split(',').map(part => part.trim().toLowerCase());
+  if (inputParts.length !== 2) return false;
+  
+  const [inputLastName, inputFirstName] = inputParts;
+  
+  return students.some(student => {
+    const studentParts = student.name.trim().split(',').map(part => part.trim().toLowerCase());
+    if (studentParts.length !== 2) return false;
+    
+    const [studentLastName, studentFirstName] = studentParts;
+    
+    // Last names must match exactly
+    // First name: input must be contained in or equal to the enrolled name
+    return studentLastName === inputLastName && 
+           studentFirstName.includes(inputFirstName);
+  });
+};
+
 export function GroupCard({ 
   group, 
+  students,
   onJoinGroup, 
   onUpdateGroup, 
   onRemoveMember, 
@@ -67,6 +90,14 @@ export function GroupCard({
 
     if (!validateNameFormat(memberName)) {
       toast.error("Please use the format: Last Name, First Name (e.g., Santos, Roi Aldrich)");
+      return;
+    }
+
+    // Check if name is in enrolled students list
+    const isEnrolled = fuzzyMatchStudent(memberName, students);
+    
+    if (!isEnrolled) {
+      toast.error("You must be enrolled in this subject to join a group. Please contact Santos, Roi Aldrich.");
       return;
     }
 

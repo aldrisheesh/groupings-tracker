@@ -75,16 +75,11 @@ export function GroupingPage({
     }
 
     // If not in any group, proceed with joining
-    onJoinGroup(groupId, memberName);
-    
-    // Show success toast
     const joinedGroup = groups.find(g => g.id === groupId);
     if (joinedGroup) {
-      toast.success(`Successfully joined ${joinedGroup.name}!`, {
-        description: `${memberName} has been added to the group.`,
-        icon: "✓",
-      });
+      toast.success(`Successfully joined ${joinedGroup.name}! ${memberName} has been added to the group.`);
     }
+    onJoinGroup(groupId, memberName);
   };
 
   return (
@@ -146,6 +141,7 @@ export function GroupingPage({
               <GroupCard
                 key={group.id}
                 group={group}
+                students={students}
                 onJoinGroup={handleJoinGroup}
                 onUpdateGroup={onUpdateGroup}
                 onRemoveMember={onRemoveMember}

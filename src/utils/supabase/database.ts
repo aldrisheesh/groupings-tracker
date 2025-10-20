@@ -7,7 +7,7 @@ export async function fetchSubjects(): Promise<Subject[]> {
   const { data: subjects, error: subjectsError } = await supabase
     .from('subjects')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false }); // Newest to oldest
 
   if (subjectsError) {
     console.error('Error fetching subjects:', subjectsError);
@@ -180,7 +180,7 @@ export async function fetchGroupings(): Promise<Grouping[]> {
   const { data, error } = await supabase
     .from('groupings')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false }); // Newest to oldest
 
   if (error) {
     console.error('Error fetching groupings:', error);

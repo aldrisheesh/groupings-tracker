@@ -12,8 +12,11 @@ import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface StudentManagementProps {
+  subjectId: string;
   students: Student[];
-  onUpdateStudents: (students: Student[]) => void;
+  onAddStudent: (studentName: string) => void;
+  onBatchAddStudents: (studentNames: string[]) => void;
+  onRemoveStudent: (studentId: string) => void;
 }
 
 // Helper function to validate name format: Last Name, First Name
@@ -22,7 +25,7 @@ const validateNameFormat = (name: string): boolean => {
   return regex.test(name.trim());
 };
 
-export function StudentManagement({ students, onUpdateStudents }: StudentManagementProps) {
+export function StudentManagement({ subjectId, students, onAddStudent, onBatchAddStudents, onRemoveStudent }: StudentManagementProps) {
   const [newStudentName, setNewStudentName] = useState("");
   const [batchStudentNames, setBatchStudentNames] = useState("");
 
@@ -46,13 +49,9 @@ export function StudentManagement({ students, onUpdateStudents }: StudentManagem
       return;
     }
 
-    const newStudent: Student = {
-      id: Date.now().toString(),
-      name: trimmedName,
-    };
-
-    onUpdateStudents([...students, newStudent]);
-    toast.success(`${trimmedName} added successfully!`);
+    // Call the handler
+    onAddStudent(trimmedName);
+    toast.success(`✓ ${trimmedName} added successfully`);
     setNewStudentName("");
   };
 
@@ -93,12 +92,7 @@ export function StudentManagement({ students, onUpdateStudents }: StudentManagem
 
     // Add all valid students
     if (validNames.length > 0) {
-      const newStudents: Student[] = validNames.map((name, index) => ({
-        id: `${Date.now()}_${index}`,
-        name: name,
-      }));
-      
-      onUpdateStudents([...students, ...newStudents]);
+      onBatchAddStudents(validNames);
     }
 
     // Show results
@@ -124,7 +118,7 @@ export function StudentManagement({ students, onUpdateStudents }: StudentManagem
   const handleRemoveStudent = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
     if (student) {
-      onUpdateStudents(students.filter(s => s.id !== studentId));
+      onRemoveStudent(studentId);
       toast.success(`${student.name} removed from the list`);
     }
   };

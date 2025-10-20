@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, Search, X, UserPlus } from "lucide-react";
 import * as Icons from "lucide-react";
 import { Subject, Student } from "../App";
@@ -16,9 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface SubjectManagementProps {
   subjects: Subject[];
-  onCreateSubject: (subject: Subject) => void;
-  onUpdateSubject: (id: string, updated: Partial<Subject>) => void;
+  onCreateSubject: (name: string, color: string, icon: string) => void;
+  onUpdateSubject: (id: string, updates: { name?: string; color?: string; icon?: string }) => void;
   onDeleteSubject: (id: string) => void;
+  onAddStudent: (subjectId: string, studentName: string) => void;
+  onBatchAddStudents: (subjectId: string, studentNames: string[]) => void;
+  onRemoveStudent: (subjectId: string, studentId: string) => void;
 }
 
 // Popular icon options from lucide-react
@@ -45,7 +48,7 @@ const COLOR_OPTIONS = [
   { name: "Teal", class: "bg-teal-500" },
 ];
 
-export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, onDeleteSubject }: SubjectManagementProps) {
+export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, onDeleteSubject, onAddStudent, onBatchAddStudents, onRemoveStudent }: SubjectManagementProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -59,6 +62,16 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
   const filteredIcons = ICON_OPTIONS.filter(icon =>
     icon.toLowerCase().includes(iconSearchQuery.toLowerCase())
   );
+
+  // Keep selectedSubject in sync with the subjects array
+  useEffect(() => {
+    if (selectedSubject) {
+      const updatedSubject = subjects.find(s => s.id === selectedSubject.id);
+      if (updatedSubject) {
+        setSelectedSubject(updatedSubject);
+      }
+    }
+  }, [subjects]);
 
   const resetForm = () => {
     setName("");
@@ -81,7 +94,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
       students: [],
     };
 
-    onCreateSubject(newSubject);
+    onCreateSubject(name.trim(), selectedColor, selectedIcon);
     toast.success(`${name} created successfully!`);
     setIsCreateDialogOpen(false);
     resetForm();
@@ -378,13 +391,11 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
             <TabsContent value="students" className="flex-1 overflow-y-auto py-4">
               {selectedSubject && (
                 <StudentManagement
+                  subjectId={selectedSubject.id}
                   students={selectedSubject.students}
-                  onUpdateStudents={(updatedStudents) => {
-                    if (selectedSubject) {
-                      onUpdateSubject(selectedSubject.id, { students: updatedStudents });
-                      setSelectedSubject({ ...selectedSubject, students: updatedStudents });
-                    }
-                  }}
+                  onAddStudent={(studentName) => onAddStudent(selectedSubject.id, studentName)}
+                  onBatchAddStudents={(studentNames) => onBatchAddStudents(selectedSubject.id, studentNames)}
+                  onRemoveStudent={(studentId) => onRemoveStudent(selectedSubject.id, studentId)}
                 />
               )}
             </TabsContent>

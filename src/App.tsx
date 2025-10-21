@@ -68,6 +68,21 @@ function App() {
   const [groupings, setGroupings] = useState<Grouping[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
+  // Helper: deduplicate members by id (fallback to name) and preserve order
+  const dedupeMembers = (members: GroupMember[]) => {
+    const map = new Map<string, GroupMember>();
+    for (const m of members) {
+      const key = String(m.id ?? m.name);
+      // Keep the first occurrence to preserve existing order
+      if (!map.has(key)) map.set(key, m);
+    }
+    return Array.from(map.values());
+  };
+
+  // Helper: normalize names for robust matching (accent-insensitive)
+  const normalizeForMatching = (text?: string) =>
+    (text ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
   // Load all data on mount
   useEffect(() => {
     loadAllData();
@@ -451,17 +466,21 @@ function App() {
 
       setGroups((prev) =>
         prev.map((group) => {
-          if (group.id !== newRow.group_id) {
-            return group;
-          }
+          if (group.id !== newRow.group_id) return group;
 
-          if (group.members.some((member) => member.id === newMember.id)) {
+          // Merge and dedupe to avoid duplicates across clients
+          const merged = [...group.members, newMember];
+          const deduped = dedupeMembers(merged);
+          deduped.sort((a, b) => a.name.localeCompare(b.name));
+
+          // If nothing changed, return original
+          if (deduped.length === group.members.length && deduped.every((m, i) => m.id === group.members[i]?.id)) {
             return group;
           }
 
           return {
             ...group,
-            members: [...group.members, newMember],
+            members: deduped,
           };
         }),
       );
@@ -496,52 +515,62 @@ function App() {
           }
 
           if (group.id === newRow.group_id) {
-            const withoutDuplicate = members.filter(
-              (member) => member.id !== newRow.id,
-            );
-            members = [...withoutDuplicate, updatedMember];
+            members = [...members.filter((member) => member.id !== newRow.id), updatedMember];
           }
 
-          if (members !== group.members) {
-            return {
-              ...group,
-              members,
-            };
+          const deduped = dedupeMembers(members);
+          deduped.sort((a, b) => a.name.localeCompare(b.name));
+
+          if (deduped.length === group.members.length && deduped.every((m, i) => m.id === group.members[i]?.id)) {
+            return group;
           }
 
-          return group;
+          return {
+            ...group,
+            members: deduped,
+          };
         }),
       );
     },
     onDelete: (payload) => {
       const oldRow = payload.old as {
-        group_id: string;
-        member_name: string;
-        id: string;
+        group_id?: string;
+        member_name?: string;
+        id?: string;
       } | null;
 
-      if (!oldRow) {
+      if (!oldRow || !oldRow.id) {
         return;
       }
 
+      console.debug("Realtime delete payload (group_members):", oldRow);
+
+      const removedId = oldRow.id;
+      const removedName = oldRow.member_name;
+      const removedNameNorm = normalizeForMatching(removedName);
+
       setGroups((prev) =>
-        prev.map((group) =>
-          group.id === oldRow.group_id
-            ? {
-                ...group,
-                members: group.members.filter((member) => member.id !== oldRow.id),
-                representative:
-                  group.representative &&
-                  group.members.some(
-                    (member) =>
-                      member.id === oldRow.id &&
-                      member.name === group.representative,
-                  )
-                    ? undefined
-                    : group.representative,
-              }
-            : group,
-        ),
+        prev.map((group) => {
+          // If this group doesn't contain the removed member by id or name, leave it unchanged
+          if (
+            !group.members.some((m) => m.id === removedId) &&
+            !group.members.some((m) => normalizeForMatching(m.name) === removedNameNorm)
+          ) {
+            return group;
+          }
+
+          const updatedMembers = group.members.filter(
+            (member) => member.id !== removedId && normalizeForMatching(member.name) !== removedNameNorm,
+          );
+
+          const representative = removedName && normalizeForMatching(group.representative ?? "") === removedNameNorm ? undefined : group.representative;
+
+          return {
+            ...group,
+            members: updatedMembers,
+            representative,
+          };
+        }),
       );
     },
   });
@@ -579,6 +608,48 @@ function App() {
       setLoading(false);
     }
   };
+
+  // Polling fallback to keep groups in sync (runs when page focused)
+  useEffect(() => {
+    let mounted = true;
+    const syncGroups = async () => {
+      try {
+        const latest = await db.fetchGroups();
+        if (!mounted) return;
+        setGroups((prev) => {
+          // quick equality check: same number of groups and same member id sets
+          if (prev.length !== latest.length) return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
+
+          const allSame = latest.every((lg) => {
+            const pg = prev.find((p) => p.id === lg.id);
+            if (!pg) return false;
+            if (pg.name !== lg.name || pg.memberLimit !== lg.memberLimit) return false;
+            const li = lg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
+            const pi = pg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
+            return li === pi && (String(lg.representative ?? '') === String(pg.representative ?? ''));
+          });
+
+          if (allSame) return prev;
+
+          return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
+        });
+      } catch (err) {
+        console.debug('Polling fetchGroups failed', err);
+      }
+    };
+
+    const id = setInterval(() => {
+      if (document.hasFocus()) syncGroups();
+    }, 3000);
+
+    // initial sync
+    syncGroups();
+
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   // Subject handlers
   const handleCreateSubject = async (
@@ -773,11 +844,13 @@ function App() {
     );
     if (newMember) {
       setGroups((prev) =>
-        prev.map((g) =>
-          g.id === groupId
-            ? { ...g, members: [...g.members, newMember] }
-            : g,
-        ),
+        prev.map((g) => {
+          if (g.id !== groupId) return g;
+          const merged = [...g.members, newMember];
+          const deduped = dedupeMembers(merged);
+          deduped.sort((a, b) => a.name.localeCompare(b.name));
+          return { ...g, members: deduped };
+        }),
       );
     } else {
       toast.error("Failed to join group");
@@ -794,11 +867,13 @@ function App() {
     );
     if (newMembers) {
       setGroups((prev) =>
-        prev.map((g) =>
-          g.id === groupId
-            ? { ...g, members: [...g.members, ...newMembers] }
-            : g,
-        ),
+        prev.map((g) => {
+          if (g.id !== groupId) return g;
+          const merged = [...g.members, ...newMembers];
+          const deduped = dedupeMembers(merged);
+          deduped.sort((a, b) => a.name.localeCompare(b.name));
+          return { ...g, members: deduped };
+        }),
       );
     } else {
       toast.error("Failed to add members");
@@ -1045,7 +1120,7 @@ function App() {
 
           <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
             <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-              📚 For detailed instructions, see{" "}
+              ���� For detailed instructions, see{" "}
               <code className="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-xs">
                 GETTING_STARTED.md
               </code>

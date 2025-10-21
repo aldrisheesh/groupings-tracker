@@ -42,12 +42,15 @@ export function useRealtime<T = Record<string, unknown>>({
       return;
     }
 
+    const chanName = channelName ?? `${schema}:${table}`;
+    console.debug(`Subscribing to realtime channel: ${chanName}`);
     const channel = supabase
-      .channel(channelName ?? `${schema}:${table}`)
+      .channel(chanName)
       .on(
         "postgres_changes",
         { event: "*", schema, table },
         (payload) => {
+          console.debug(`Realtime payload for ${chanName}:`, payload?.eventType, payload?.old, payload?.new);
           switch (payload.eventType) {
             case "INSERT":
               insertRef.current?.(
@@ -71,6 +74,8 @@ export function useRealtime<T = Record<string, unknown>>({
       );
 
     channel.subscribe();
+
+    console.debug(`Subscribed to realtime channel: ${chanName}`);
 
     return () => {
       supabase.removeChannel(channel);

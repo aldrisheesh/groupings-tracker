@@ -294,64 +294,74 @@ export function GroupCard({
               Members ({group.members.length}/{group.memberLimit}):
             </p>
             <ul className="space-y-1">
-              {[...group.members]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((member) => {
-                const isRepresentative = group.representative === member.name;
-                return (
-                  <li key={member.id} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
-                      <span className="flex-1 min-w-0 truncate">{member.name}</span>
-                      {isRepresentative && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-flex">
-                                <Badge className="bg-amber-500 hover:bg-amber-500 dark:bg-amber-600 dark:hover:bg-amber-600 flex-shrink-0">
-                              <Crown className="w-3 h-3" />
-                            </Badge>
-                          </span>
-                        </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Group Representative</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+              {(() => {
+                const sorted = [...group.members].sort((a, b) => a.name.localeCompare(b.name));
+                const seen = new Set();
+                return sorted
+                  .filter((member) => {
+                    const signature = `${member.id ?? ''}::${member.name}`;
+                    if (seen.has(signature)) return false;
+                    seen.add(signature);
+                    return true;
+                  })
+                  .map((member, index) => {
+                    const isRepresentative = group.representative === member.name;
+                    const key = `${member.id ?? member.name}-${index}`;
+                    return (
+                      <li key={key} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
+                          <span className="flex-1 min-w-0 truncate">{member.name}</span>
+                          {isRepresentative && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <Badge className="bg-amber-500 hover:bg-amber-500 dark:bg-amber-600 dark:hover:bg-amber-600 flex-shrink-0">
+                                      <Crown className="w-3 h-3" />
+                                    </Badge>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Group Representative</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
+                                  onClick={() => handleToggleRepresentative(member)}
+                                >
+                                  <Crown className="w-3 h-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          {!isLocked && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
-                              onClick={() => handleToggleRepresentative(member)}
+                              className="h-6 w-6 dark:hover:bg-slate-800"
+                              onClick={() => handleRemoveMember(member)}
                             >
-                              <Crown className="w-3 h-3" />
+                              <X className="w-3 h-3 text-red-600 dark:text-red-400" />
                             </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      {!isLocked && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 dark:hover:bg-slate-800"
-                          onClick={() => handleRemoveMember(member)}
-                        >
-                          <X className="w-3 h-3 text-red-600 dark:text-red-400" />
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
+                          )}
+                        </div>
+                      </li>
+                    );
+                  });
+              })()}
             </ul>
           </div>
         </CardContent>

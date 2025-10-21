@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { Subject, Student, Grouping, Group } from '../../App';
+import { Subject, Student, Grouping, Group, GroupMember } from '../../App';
 
 // ============ SUBJECTS ============
 
@@ -294,7 +294,7 @@ export async function fetchGroups(): Promise<Group[]> {
     name: group.name,
     members: members
       .filter(member => member.group_id === group.id)
-      .map(member => member.member_name),
+      .map(member => ({ id: member.id, name: member.member_name })),
     memberLimit: group.member_limit,
     representative: group.representative || undefined,
   }));
@@ -346,7 +346,7 @@ export async function updateGroup(id: string, updates: Partial<Group>): Promise<
       .eq('group_id', id);
 
     const currentMemberNames = currentMembers?.map(m => m.member_name) || [];
-    const newMemberNames = updates.members;
+    const newMemberNames = updates.members.map(member => member.name);
 
     // Find members to add and remove
     const toAdd = newMemberNames.filter(name => !currentMemberNames.includes(name));
@@ -404,7 +404,7 @@ export async function deleteGroup(id: string): Promise<boolean> {
   return true;
 }
 
-export async function addMemberToGroup(groupId: string, memberName: string): Promise<boolean> {
+export async function addMemberToGroup(groupId: string, memberName: string): Promise<GroupMember | null> {
   const newMember = {
     id: crypto.randomUUID(),
     group_id: groupId,
@@ -417,13 +417,13 @@ export async function addMemberToGroup(groupId: string, memberName: string): Pro
 
   if (error) {
     console.error('Error adding member to group:', error);
-    return false;
+    return null;
   }
 
-  return true;
+  return { id: newMember.id, name: memberName };
 }
 
-export async function batchAddMembersToGroup(groupId: string, memberNames: string[]): Promise<boolean> {
+export async function batchAddMembersToGroup(groupId: string, memberNames: string[]): Promise<GroupMember[] | null> {
   const newMembers = memberNames.map(name => ({
     id: crypto.randomUUID(),
     group_id: groupId,
@@ -436,10 +436,10 @@ export async function batchAddMembersToGroup(groupId: string, memberNames: strin
 
   if (error) {
     console.error('Error batch adding members to group:', error);
-    return false;
+    return null;
   }
 
-  return true;
+  return newMembers.map(member => ({ id: member.id, name: member.member_name }));
 }
 
 export async function removeMemberFromGroup(groupId: string, memberName: string): Promise<boolean> {

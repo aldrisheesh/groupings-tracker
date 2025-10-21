@@ -23,11 +23,16 @@ export type Grouping = {
   locked?: boolean;
 };
 
+export type GroupMember = {
+  id: string;
+  name: string;
+};
+
 export type Group = {
   id: string;
   groupingId: string;
   name: string;
-  members: string[];
+  members: GroupMember[];
   memberLimit: number;
   representative?: string;
 };
@@ -445,13 +450,18 @@ function App() {
             return group;
           }
 
-          if (group.members.includes(newRow.member_name)) {
+          if (
+            group.members.some((member) => member.id === newRow.id)
+          ) {
             return group;
           }
 
           return {
             ...group,
-            members: [...group.members, newRow.member_name],
+            members: [
+              ...group.members,
+              { id: newRow.id, name: newRow.member_name },
+            ],
           };
         }),
       );
@@ -474,48 +484,91 @@ function App() {
 
       setGroups((prev) =>
         prev.map((group) => {
+          const isOldGroup = group.id === oldRow.group_id;
+          const isNewGroup = group.id === newRow.group_id;
+
+          if (!isOldGroup && !isNewGroup) {
+            return group;
+          }
+
           let members = group.members;
 
-          if (group.id === oldRow.group_id) {
-            members = members.filter((member) => member !== oldRow.member_name);
+          if (isOldGroup) {
+            members = members.filter((member) => member.id !== oldRow.id);
           }
 
-          if (group.id === newRow.group_id) {
+          if (isNewGroup) {
             const withoutDuplicate = members.filter(
-              (member) => member !== newRow.member_name,
+              (member) => member.id !== newRow.id,
             );
-            members = [...withoutDuplicate, newRow.member_name];
+            members = [
+              ...withoutDuplicate,
+              { id: newRow.id, name: newRow.member_name },
+            ];
           }
 
-          if (members !== group.members) {
-            return {
-              ...group,
-              members,
-            };
+          if (members === group.members) {
+            return group;
           }
 
-          return group;
+          const removedMember = group.members.find(
+            (member) => member.id === oldRow.id,
+          );
+
+          return {
+            ...group,
+            members,
+            representative:
+              removedMember && group.representative === removedMember.name
+                ? undefined
+                : group.representative,
+          };
         }),
       );
     },
     onDelete: (payload) => {
       const oldRow = payload.old as {
-        group_id: string;
-        member_name: string;
+        id: string;
+        group_id?: string;
+        member_name?: string;
       } | null;
 
-      if (!oldRow) {
+      if (!oldRow?.id) {
         return;
       }
 
       setGroups((prev) =>
         prev.map((group) =>
-          group.id === oldRow.group_id
-            ? {
-                ...group,
-                members: group.members.filter((member) => member !== oldRow.member_name),
-              }
-            : group,
+          {
+            const shouldUpdate = oldRow.group_id
+              ? group.id === oldRow.group_id
+              : group.members.some((member) => member.id === oldRow.id);
+
+            if (!shouldUpdate) {
+              return group;
+            }
+
+            const memberToRemove = group.members.find(
+              (member) => member.id === oldRow.id,
+            );
+
+            if (!memberToRemove) {
+              return group;
+            }
+
+            const updatedMembers = group.members.filter(
+              (member) => member.id !== oldRow.id,
+            );
+
+            return {
+              ...group,
+              members: updatedMembers,
+              representative:
+                group.representative === memberToRemove.name
+                  ? undefined
+                  : group.representative,
+            };
+          },
         ),
       );
     },
@@ -742,15 +795,15 @@ function App() {
     groupId: string,
     memberName: string,
   ) => {
-    const success = await db.addMemberToGroup(
+    const newMember = await db.addMemberToGroup(
       groupId,
       memberName,
     );
-    if (success) {
-      setGroups(
-        groups.map((g) =>
+    if (newMember) {
+      setGroups((prev) =>
+        prev.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, memberName] }
+            ? { ...g, members: [...g.members, newMember] }
             : g,
         ),
       );
@@ -763,15 +816,15 @@ function App() {
     groupId: string,
     memberNames: string[],
   ) => {
-    const success = await db.batchAddMembersToGroup(
+    const newMembers = await db.batchAddMembersToGroup(
       groupId,
       memberNames,
     );
-    if (success) {
-      setGroups(
-        groups.map((g) =>
+    if (newMembers) {
+      setGroups((prev) =>
+        prev.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, ...memberNames] }
+            ? { ...g, members: [...g.members, ...newMembers] }
             : g,
         ),
       );
@@ -805,17 +858,23 @@ function App() {
       memberName,
     );
     if (success) {
-      setGroups(
-        groups.map((g) =>
-          g.id === groupId
-            ? {
-                ...g,
-                members: g.members.filter(
-                  (m) => m !== memberName,
-                ),
-              }
-            : g,
-        ),
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id !== groupId) {
+            return g;
+          }
+
+          const updatedMembers = g.members.filter(
+            (m) => m.name !== memberName,
+          );
+
+          return {
+            ...g,
+            members: updatedMembers,
+            representative:
+              g.representative === memberName ? undefined : g.representative,
+          };
+        }),
       );
     } else {
       toast.error("Failed to remove member");

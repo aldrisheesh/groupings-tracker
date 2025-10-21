@@ -25,6 +25,7 @@ interface GroupCardProps {
   group: Group;
   students: Student[];
   onJoinGroup: (groupId: string, memberName: string) => void;
+  onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
   onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
   onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
@@ -74,7 +75,8 @@ const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
 export function GroupCard({ 
   group, 
   students,
-  onJoinGroup, 
+  onJoinGroup,
+  onBatchJoinGroup,
   onUpdateGroup, 
   onRemoveMember, 
   onDeleteGroup,
@@ -172,10 +174,8 @@ export function GroupCard({
       return;
     }
 
-    // Add all members
-    names.forEach(name => {
-      onJoinGroup(group.id, name);
-    });
+    // Add all members at once
+    onBatchJoinGroup(group.id, names);
 
     setBatchMemberNames("");
     setIsJoinDialogOpen(false);

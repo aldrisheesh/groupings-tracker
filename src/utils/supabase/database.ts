@@ -423,6 +423,25 @@ export async function addMemberToGroup(groupId: string, memberName: string): Pro
   return true;
 }
 
+export async function batchAddMembersToGroup(groupId: string, memberNames: string[]): Promise<boolean> {
+  const newMembers = memberNames.map(name => ({
+    id: crypto.randomUUID(),
+    group_id: groupId,
+    member_name: name,
+  }));
+
+  const { error } = await supabase
+    .from('group_members')
+    .insert(newMembers);
+
+  if (error) {
+    console.error('Error batch adding members to group:', error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function removeMemberFromGroup(groupId: string, memberName: string): Promise<boolean> {
   const { error } = await supabase
     .from('group_members')

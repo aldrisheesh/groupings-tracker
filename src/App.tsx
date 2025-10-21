@@ -305,6 +305,27 @@ function App() {
     }
   };
 
+  const handleBatchJoinGroup = async (
+    groupId: string,
+    memberNames: string[],
+  ) => {
+    const success = await db.batchAddMembersToGroup(
+      groupId,
+      memberNames,
+    );
+    if (success) {
+      setGroups(
+        groups.map((g) =>
+          g.id === groupId
+            ? { ...g, members: [...g.members, ...memberNames] }
+            : g,
+        ),
+      );
+    } else {
+      toast.error("Failed to add members");
+    }
+  };
+
   const handleUpdateGroup = async (
     groupId: string,
     updatedGroup: Partial<Group>,
@@ -602,6 +623,7 @@ function App() {
                 students={subject.students}
                 onCreateGroup={handleCreateGroup}
                 onJoinGroup={handleJoinGroup}
+                onBatchJoinGroup={handleBatchJoinGroup}
                 onUpdateGroup={handleUpdateGroup}
                 onRemoveMember={handleRemoveMember}
                 onDeleteGroup={handleDeleteGroup}

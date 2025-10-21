@@ -15,6 +15,7 @@ interface GroupingPageProps {
   students: Student[];
   onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => void;
   onJoinGroup: (groupId: string, memberName: string) => void;
+  onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
   onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
   onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
@@ -30,6 +31,7 @@ export function GroupingPage({
   students,
   onCreateGroup,
   onJoinGroup,
+  onBatchJoinGroup,
   onUpdateGroup,
   onRemoveMember,
   onDeleteGroup,
@@ -143,6 +145,7 @@ export function GroupingPage({
                 group={group}
                 students={students}
                 onJoinGroup={handleJoinGroup}
+                onBatchJoinGroup={onBatchJoinGroup}
                 onUpdateGroup={onUpdateGroup}
                 onRemoveMember={onRemoveMember}
                 onDeleteGroup={onDeleteGroup}

@@ -20,17 +20,37 @@ const normalizeNameForMatching = (name: string): string => {
     .trim()
     .toLowerCase()
     .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritical marks
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+    .replace(/\s*-\s*/g, '-') // Normalize spacing around hyphens: "a - b" becomes "a-b"
+    .replace(/\s+/g, ' '); // Normalize multiple spaces to single space
 };
 
 const fuzzyMatch = (studentName: string, memberName: string): boolean => {
   const normalizedStudent = normalizeNameForMatching(studentName);
   const normalizedMember = normalizeNameForMatching(memberName);
   
-  // Check if one name starts with the other
-  // This handles: "Santos, Roi" matching "Santos, Roi Aldrich"
-  return normalizedStudent.startsWith(normalizedMember) || 
-         normalizedMember.startsWith(normalizedStudent);
+  // Split by comma to get last name and first name
+  const studentParts = normalizedStudent.split(',').map(p => p.trim());
+  const memberParts = normalizedMember.split(',').map(p => p.trim());
+  
+  // Both must have last name and first name
+  if (studentParts.length !== 2 || memberParts.length !== 2) {
+    // Fallback to simple string matching
+    return normalizedStudent.startsWith(normalizedMember) || 
+           normalizedMember.startsWith(normalizedStudent);
+  }
+  
+  const [studentLast, studentFirst] = studentParts;
+  const [memberLast, memberFirst] = memberParts;
+  
+  // Last names must match exactly
+  if (studentLast !== memberLast) {
+    return false;
+  }
+  
+  // First names: check if one contains the other (bidirectional)
+  // This handles "Angelie" matching "Mary Angelie" and vice versa
+  return studentFirst.includes(memberFirst) || memberFirst.includes(studentFirst);
 };
 
 export function StudentAvailability({ students, groups }: StudentAvailabilityProps) {

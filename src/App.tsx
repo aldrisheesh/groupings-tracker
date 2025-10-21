@@ -543,6 +543,8 @@ function App() {
         return;
       }
 
+      console.debug("Realtime delete payload (group_members):", oldRow);
+
       const removedId = oldRow.id;
       const removedName = oldRow.member_name;
       const removedNameNorm = normalizeForMatching(removedName);

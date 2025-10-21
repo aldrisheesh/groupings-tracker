@@ -23,11 +23,16 @@ export type Grouping = {
   locked?: boolean;
 };
 
+export type GroupMember = {
+  id: string;
+  name: string;
+};
+
 export type Group = {
   id: string;
   groupingId: string;
   name: string;
-  members: string[];
+  members: GroupMember[];
   memberLimit: number;
   representative?: string;
 };
@@ -439,19 +444,24 @@ function App() {
         return;
       }
 
+      const newMember: GroupMember = {
+        id: newRow.id,
+        name: newRow.member_name,
+      };
+
       setGroups((prev) =>
         prev.map((group) => {
           if (group.id !== newRow.group_id) {
             return group;
           }
 
-          if (group.members.includes(newRow.member_name)) {
+          if (group.members.some((member) => member.id === newMember.id)) {
             return group;
           }
 
           return {
             ...group,
-            members: [...group.members, newRow.member_name],
+            members: [...group.members, newMember],
           };
         }),
       );
@@ -472,19 +482,24 @@ function App() {
         return;
       }
 
+      const updatedMember: GroupMember = {
+        id: newRow.id,
+        name: newRow.member_name,
+      };
+
       setGroups((prev) =>
         prev.map((group) => {
           let members = group.members;
 
           if (group.id === oldRow.group_id) {
-            members = members.filter((member) => member !== oldRow.member_name);
+            members = members.filter((member) => member.id !== oldRow.id);
           }
 
           if (group.id === newRow.group_id) {
             const withoutDuplicate = members.filter(
-              (member) => member !== newRow.member_name,
+              (member) => member.id !== newRow.id,
             );
-            members = [...withoutDuplicate, newRow.member_name];
+            members = [...withoutDuplicate, updatedMember];
           }
 
           if (members !== group.members) {
@@ -502,6 +517,7 @@ function App() {
       const oldRow = payload.old as {
         group_id: string;
         member_name: string;
+        id: string;
       } | null;
 
       if (!oldRow) {
@@ -513,7 +529,16 @@ function App() {
           group.id === oldRow.group_id
             ? {
                 ...group,
-                members: group.members.filter((member) => member !== oldRow.member_name),
+                members: group.members.filter((member) => member.id !== oldRow.id),
+                representative:
+                  group.representative &&
+                  group.members.some(
+                    (member) =>
+                      member.id === oldRow.id &&
+                      member.name === group.representative,
+                  )
+                    ? undefined
+                    : group.representative,
               }
             : group,
         ),
@@ -742,15 +767,15 @@ function App() {
     groupId: string,
     memberName: string,
   ) => {
-    const success = await db.addMemberToGroup(
+    const newMember = await db.addMemberToGroup(
       groupId,
       memberName,
     );
-    if (success) {
-      setGroups(
-        groups.map((g) =>
+    if (newMember) {
+      setGroups((prev) =>
+        prev.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, memberName] }
+            ? { ...g, members: [...g.members, newMember] }
             : g,
         ),
       );
@@ -763,15 +788,15 @@ function App() {
     groupId: string,
     memberNames: string[],
   ) => {
-    const success = await db.batchAddMembersToGroup(
+    const newMembers = await db.batchAddMembersToGroup(
       groupId,
       memberNames,
     );
-    if (success) {
-      setGroups(
-        groups.map((g) =>
+    if (newMembers) {
+      setGroups((prev) =>
+        prev.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, ...memberNames] }
+            ? { ...g, members: [...g.members, ...newMembers] }
             : g,
         ),
       );
@@ -782,14 +807,38 @@ function App() {
 
   const handleUpdateGroup = async (
     groupId: string,
-    updatedGroup: Partial<Group>,
+    updatedGroup: {
+      name?: string;
+      memberLimit?: number;
+      representative?: string | null;
+    },
   ) => {
     const success = await db.updateGroup(groupId, updatedGroup);
     if (success) {
-      setGroups(
-        groups.map((g) =>
-          g.id === groupId ? { ...g, ...updatedGroup } : g,
-        ),
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id !== groupId) {
+            return g;
+          }
+
+          return {
+            ...g,
+            ...(updatedGroup.name !== undefined
+              ? { name: updatedGroup.name }
+              : {}),
+            ...(updatedGroup.memberLimit !== undefined
+              ? { memberLimit: updatedGroup.memberLimit }
+              : {}),
+            ...(updatedGroup.representative !== undefined
+              ? {
+                  representative:
+                    updatedGroup.representative === null
+                      ? undefined
+                      : updatedGroup.representative,
+                }
+              : {}),
+          };
+        }),
       );
     } else {
       toast.error("Failed to update group");
@@ -798,24 +847,30 @@ function App() {
 
   const handleRemoveMember = async (
     groupId: string,
-    memberName: string,
+    memberId: string,
   ) => {
     const success = await db.removeMemberFromGroup(
-      groupId,
-      memberName,
+      memberId,
     );
     if (success) {
-      setGroups(
-        groups.map((g) =>
-          g.id === groupId
-            ? {
-                ...g,
-                members: g.members.filter(
-                  (m) => m !== memberName,
-                ),
-              }
-            : g,
-        ),
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id !== groupId) {
+            return g;
+          }
+
+          const removedMember = g.members.find((member) => member.id === memberId);
+          const updatedMembers = g.members.filter((member) => member.id !== memberId);
+
+          return {
+            ...g,
+            members: updatedMembers,
+            representative:
+              removedMember && g.representative === removedMember.name
+                ? undefined
+                : g.representative,
+          };
+        }),
       );
     } else {
       toast.error("Failed to remove member");

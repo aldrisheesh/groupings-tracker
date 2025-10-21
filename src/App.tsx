@@ -79,6 +79,10 @@ function App() {
     return Array.from(map.values());
   };
 
+  // Helper: normalize names for robust matching (accent-insensitive)
+  const normalizeForMatching = (text?: string) =>
+    (text ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
   // Load all data on mount
   useEffect(() => {
     loadAllData();
@@ -541,14 +545,23 @@ function App() {
 
       const removedId = oldRow.id;
       const removedName = oldRow.member_name;
+      const removedNameNorm = normalizeForMatching(removedName);
 
       setGroups((prev) =>
         prev.map((group) => {
-          // If this group doesn't contain the removed member, leave it unchanged
-          if (!group.members.some((m) => m.id === removedId)) return group;
+          // If this group doesn't contain the removed member by id or name, leave it unchanged
+          if (
+            !group.members.some((m) => m.id === removedId) &&
+            !group.members.some((m) => normalizeForMatching(m.name) === removedNameNorm)
+          ) {
+            return group;
+          }
 
-          const updatedMembers = group.members.filter((member) => member.id !== removedId);
-          const representative = removedName && group.representative === removedName ? undefined : group.representative;
+          const updatedMembers = group.members.filter(
+            (member) => member.id !== removedId && normalizeForMatching(member.name) !== removedNameNorm,
+          );
+
+          const representative = removedName && normalizeForMatching(group.representative ?? "") === removedNameNorm ? undefined : group.representative;
 
           return {
             ...group,

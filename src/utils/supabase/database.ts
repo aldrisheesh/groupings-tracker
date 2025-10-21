@@ -160,7 +160,63 @@ export async function batchAddStudents(subjectId: string, studentNames: string[]
   return true;
 }
 
-export async function removeStudentFromSubject(studentId: string): Promise<boolean> {
+export async function removeStudentFromSubject(
+  studentId: string,
+  subjectId: string,
+  studentName?: string,
+): Promise<boolean> {
+  let hasError = false;
+
+  if (studentName) {
+    const { data: subjectGroupings, error: groupingError } = await supabase
+      .from('groupings')
+      .select('id')
+      .eq('subject_id', subjectId);
+
+    if (groupingError) {
+      console.error('Error fetching groupings for student removal:', groupingError);
+      hasError = true;
+    } else if (subjectGroupings && subjectGroupings.length > 0) {
+      const groupingIds = subjectGroupings.map(grouping => grouping.id);
+
+      const { data: subjectGroups, error: groupsError } = await supabase
+        .from('groups')
+        .select('id')
+        .in('grouping_id', groupingIds);
+
+      if (groupsError) {
+        console.error('Error fetching groups for student removal:', groupsError);
+        hasError = true;
+      } else {
+        const groupIds = subjectGroups?.map(group => group.id) ?? [];
+
+        if (groupIds.length > 0) {
+          const { error: memberError } = await supabase
+            .from('group_members')
+            .delete()
+            .in('group_id', groupIds)
+            .eq('member_name', studentName);
+
+          if (memberError) {
+            console.error('Error removing student from group members:', memberError);
+            hasError = true;
+          }
+
+          const { error: representativeError } = await supabase
+            .from('groups')
+            .update({ representative: null })
+            .in('id', groupIds)
+            .eq('representative', studentName);
+
+          if (representativeError) {
+            console.error('Error clearing group representative:', representativeError);
+            hasError = true;
+          }
+        }
+      }
+    }
+  }
+
   const { error } = await supabase
     .from('students')
     .delete()
@@ -171,7 +227,7 @@ export async function removeStudentFromSubject(studentId: string): Promise<boole
     return false;
   }
 
-  return true;
+  return !hasError;
 }
 
 // ============ GROUPINGS ============

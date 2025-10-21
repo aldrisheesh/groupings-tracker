@@ -6,8 +6,7 @@ import { GroupingPage } from "./components/GroupingPage";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import * as db from "./utils/supabase/database";
-import { supabase } from "./utils/supabase/client";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { useRealtime } from "./hooks/useRealtime";
 
 export type Subject = {
   id: string;
@@ -69,187 +68,458 @@ function App() {
     loadAllData();
   }, []);
 
-  // Set up real-time subscriptions
-  useEffect(() => {
-    if (loading || dbError) return;
+  useRealtime({
+    table: "subjects",
+    onInsert: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        name: string;
+        color: string;
+        icon: string;
+      } | null;
 
-    console.log('Setting up real-time subscriptions...');
+      if (!newRow) {
+        return;
+      }
 
-    // Subscribe to subjects table
-    const subjectsChannel = supabase
-      .channel('subjects-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'subjects' },
-        async (payload: RealtimePostgresChangesPayload<any>) => {
-          console.log('Subjects change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const newSubject = await db.fetchSubjects();
-            const inserted = newSubject.find((s: Subject) => s.id === payload.new.id);
-            if (inserted) {
-              setSubjects((prev) => {
-                if (prev.some(s => s.id === inserted.id)) return prev;
-                return [...prev, inserted];
-              });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedSubjects = await db.fetchSubjects();
-            const updated = updatedSubjects.find((s: Subject) => s.id === payload.new.id);
-            if (updated) {
-              setSubjects((prev) => prev.map((s) => s.id === updated.id ? updated : s));
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setSubjects((prev) => prev.filter((s) => s.id !== payload.old.id));
-            setGroupings((prev) => prev.filter((g) => g.subjectId !== payload.old.id));
+      const newSubject: Subject = {
+        id: newRow.id,
+        name: newRow.name,
+        color: newRow.color,
+        icon: newRow.icon,
+        students: [],
+      };
+
+      setSubjects((prev) => {
+        const existingIndex = prev.findIndex((subject) => subject.id === newSubject.id);
+        if (existingIndex !== -1) {
+          return prev.map((subject) =>
+            subject.id === newSubject.id
+              ? {
+                  ...subject,
+                  name: newSubject.name,
+                  color: newSubject.color,
+                  icon: newSubject.icon,
+                }
+              : subject,
+          );
+        }
+
+        return [newSubject, ...prev];
+      });
+    },
+    onUpdate: (payload) => {
+      const updatedRow = payload.new as {
+        id: string;
+        name: string;
+        color: string;
+        icon: string;
+      } | null;
+
+      if (!updatedRow) {
+        return;
+      }
+
+      setSubjects((prev) =>
+        prev.map((subject) =>
+          subject.id === updatedRow.id
+            ? {
+                ...subject,
+                name: updatedRow.name,
+                color: updatedRow.color,
+                icon: updatedRow.icon,
+              }
+            : subject,
+        ),
+      );
+    },
+    onDelete: (payload) => {
+      const removedRow = payload.old as { id: string } | null;
+      if (!removedRow) {
+        return;
+      }
+
+      const groupingIdsToRemove = groupings
+        .filter((grouping) => grouping.subjectId === removedRow.id)
+        .map((grouping) => grouping.id);
+
+      setSubjects((prev) => prev.filter((subject) => subject.id !== removedRow.id));
+      setGroupings((prev) => prev.filter((grouping) => grouping.subjectId !== removedRow.id));
+      setGroups((prev) =>
+        prev.filter((group) => !groupingIdsToRemove.includes(group.groupingId)),
+      );
+      setCurrentPage((prev) => {
+        if (prev.type === "subject" && prev.subjectId === removedRow.id) {
+          return { type: "home" };
+        }
+        if (prev.type === "grouping" && prev.subjectId === removedRow.id) {
+          return { type: "home" };
+        }
+        return prev;
+      });
+    },
+  });
+
+  useRealtime({
+    table: "students",
+    onInsert: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        subject_id: string;
+        name: string;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      const newStudent: Student = {
+        id: newRow.id,
+        name: newRow.name,
+      };
+
+      setSubjects((prev) =>
+        prev.map((subject) => {
+          if (subject.id !== newRow.subject_id) {
+            return subject;
           }
-        }
-      )
-      .subscribe();
 
-    // Subscribe to students table
-    const studentsChannel = supabase
-      .channel('students-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'students' },
-        async () => {
-          console.log('Students change received, reloading subjects...');
-          // Reload all subjects to get updated students
-          const updatedSubjects = await db.fetchSubjects();
-          setSubjects(updatedSubjects);
-        }
-      )
-      .subscribe();
+          const alreadyExists = subject.students.some(
+            (student) => student.id === newStudent.id,
+          );
 
-    // Subscribe to groupings table
-    const groupingsChannel = supabase
-      .channel('groupings-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'groupings' },
-        async (payload: RealtimePostgresChangesPayload<any>) => {
-          console.log('Groupings change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const newGrouping: Grouping = {
-              id: payload.new.id,
-              subjectId: payload.new.subject_id,
-              title: payload.new.title,
-              locked: payload.new.locked,
+          if (alreadyExists) {
+            return subject;
+          }
+
+          return {
+            ...subject,
+            students: [...subject.students, newStudent],
+          };
+        }),
+      );
+    },
+    onUpdate: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        subject_id: string;
+        name: string;
+      } | null;
+      const oldRow = payload.old as {
+        id: string;
+        subject_id: string;
+        name?: string;
+      } | null;
+
+      if (!newRow || !oldRow) {
+        return;
+      }
+
+      const updatedStudent: Student = {
+        id: newRow.id,
+        name: newRow.name,
+      };
+
+      setSubjects((prev) =>
+        prev.map((subject) => {
+          let students = subject.students;
+
+          if (subject.id === oldRow.subject_id && oldRow.subject_id !== newRow.subject_id) {
+            students = students.filter((student) => student.id !== oldRow.id);
+          }
+
+          if (subject.id === newRow.subject_id) {
+            const withoutUpdated = students.filter((student) => student.id !== newRow.id);
+            students = [...withoutUpdated, updatedStudent];
+          }
+
+          if (students !== subject.students) {
+            return {
+              ...subject,
+              students,
             };
-            setGroupings((prev) => {
-              if (prev.some(g => g.id === newGrouping.id)) return prev;
-              return [...prev, newGrouping];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setGroupings((prev) =>
-              prev.map((g) =>
-                g.id === payload.new.id
-                  ? {
-                      ...g,
-                      title: payload.new.title,
-                      locked: payload.new.locked,
-                    }
-                  : g
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setGroupings((prev) => prev.filter((g) => g.id !== payload.old.id));
-            setGroups((prev) => prev.filter((gr) => gr.groupingId !== payload.old.id));
           }
-        }
-      )
-      .subscribe();
 
-    // Subscribe to groups table
-    const groupsChannel = supabase
-      .channel('groups-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'groups' },
-        async (payload: RealtimePostgresChangesPayload<any>) => {
-          console.log('Groups change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const newGroup: Group = {
-              id: payload.new.id,
-              groupingId: payload.new.grouping_id,
-              name: payload.new.name,
-              members: [],
-              memberLimit: payload.new.member_limit,
-              representative: payload.new.representative || undefined,
+          return subject;
+        }),
+      );
+    },
+    onDelete: (payload) => {
+      const oldRow = payload.old as {
+        id: string;
+        subject_id: string;
+      } | null;
+
+      if (!oldRow) {
+        return;
+      }
+
+      setSubjects((prev) =>
+        prev.map((subject) =>
+          subject.id === oldRow.subject_id
+            ? {
+                ...subject,
+                students: subject.students.filter((student) => student.id !== oldRow.id),
+              }
+            : subject,
+        ),
+      );
+    },
+  });
+
+  useRealtime({
+    table: "groupings",
+    onInsert: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        subject_id: string;
+        title: string;
+        locked: boolean | null;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      const newGrouping: Grouping = {
+        id: newRow.id,
+        subjectId: newRow.subject_id,
+        title: newRow.title,
+        locked: newRow.locked ?? undefined,
+      };
+
+      setGroupings((prev) => {
+        const exists = prev.some((grouping) => grouping.id === newGrouping.id);
+        if (exists) {
+          return prev.map((grouping) =>
+            grouping.id === newGrouping.id ? { ...grouping, ...newGrouping } : grouping,
+          );
+        }
+
+        return [newGrouping, ...prev];
+      });
+    },
+    onUpdate: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        subject_id: string;
+        title: string;
+        locked: boolean | null;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      setGroupings((prev) =>
+        prev.map((grouping) =>
+          grouping.id === newRow.id
+            ? {
+                ...grouping,
+                subjectId: newRow.subject_id,
+                title: newRow.title,
+                locked: newRow.locked ?? undefined,
+              }
+            : grouping,
+        ),
+      );
+    },
+    onDelete: (payload) => {
+      const oldRow = payload.old as {
+        id: string;
+        subject_id: string;
+      } | null;
+
+      if (!oldRow) {
+        return;
+      }
+
+      setGroupings((prev) => prev.filter((grouping) => grouping.id !== oldRow.id));
+      setGroups((prev) => prev.filter((group) => group.groupingId !== oldRow.id));
+      setCurrentPage((prev) => {
+        if (prev.type === "grouping" && prev.groupingId === oldRow.id) {
+          return { type: "subject", subjectId: oldRow.subject_id };
+        }
+
+        return prev;
+      });
+    },
+  });
+
+  useRealtime({
+    table: "groups",
+    onInsert: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        grouping_id: string;
+        name: string;
+        member_limit: number;
+        representative: string | null;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      const newGroup: Group = {
+        id: newRow.id,
+        groupingId: newRow.grouping_id,
+        name: newRow.name,
+        members: [],
+        memberLimit: newRow.member_limit,
+        representative: newRow.representative ?? undefined,
+      };
+
+      setGroups((prev) => {
+        const existing = prev.find((group) => group.id === newGroup.id);
+        if (existing) {
+          return prev.map((group) =>
+            group.id === newGroup.id
+              ? {
+                  ...existing,
+                  groupingId: newGroup.groupingId,
+                  name: newGroup.name,
+                  memberLimit: newGroup.memberLimit,
+                  representative: newGroup.representative,
+                }
+              : group,
+          );
+        }
+
+        return [...prev, newGroup];
+      });
+    },
+    onUpdate: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        grouping_id: string;
+        name: string;
+        member_limit: number;
+        representative: string | null;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      setGroups((prev) =>
+        prev.map((group) =>
+          group.id === newRow.id
+            ? {
+                ...group,
+                groupingId: newRow.grouping_id,
+                name: newRow.name,
+                memberLimit: newRow.member_limit,
+                representative: newRow.representative ?? undefined,
+              }
+            : group,
+        ),
+      );
+    },
+    onDelete: (payload) => {
+      const oldRow = payload.old as { id: string } | null;
+      if (!oldRow) {
+        return;
+      }
+
+      setGroups((prev) => prev.filter((group) => group.id !== oldRow.id));
+    },
+  });
+
+  useRealtime({
+    table: "group_members",
+    onInsert: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        group_id: string;
+        member_name: string;
+      } | null;
+
+      if (!newRow) {
+        return;
+      }
+
+      setGroups((prev) =>
+        prev.map((group) => {
+          if (group.id !== newRow.group_id) {
+            return group;
+          }
+
+          if (group.members.includes(newRow.member_name)) {
+            return group;
+          }
+
+          return {
+            ...group,
+            members: [...group.members, newRow.member_name],
+          };
+        }),
+      );
+    },
+    onUpdate: (payload) => {
+      const newRow = payload.new as {
+        id: string;
+        group_id: string;
+        member_name: string;
+      } | null;
+      const oldRow = payload.old as {
+        id: string;
+        group_id: string;
+        member_name: string;
+      } | null;
+
+      if (!newRow || !oldRow) {
+        return;
+      }
+
+      setGroups((prev) =>
+        prev.map((group) => {
+          let members = group.members;
+
+          if (group.id === oldRow.group_id) {
+            members = members.filter((member) => member !== oldRow.member_name);
+          }
+
+          if (group.id === newRow.group_id) {
+            const withoutDuplicate = members.filter(
+              (member) => member !== newRow.member_name,
+            );
+            members = [...withoutDuplicate, newRow.member_name];
+          }
+
+          if (members !== group.members) {
+            return {
+              ...group,
+              members,
             };
-            setGroups((prev) => {
-              if (prev.some(g => g.id === newGroup.id)) return prev;
-              return [...prev, newGroup];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setGroups((prev) =>
-              prev.map((g) =>
-                g.id === payload.new.id
-                  ? {
-                      ...g,
-                      name: payload.new.name,
-                      memberLimit: payload.new.member_limit,
-                      representative: payload.new.representative || undefined,
-                    }
-                  : g
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setGroups((prev) => prev.filter((g) => g.id !== payload.old.id));
           }
-        }
-      )
-      .subscribe();
 
-    // Subscribe to group_members table
-    const groupMembersChannel = supabase
-      .channel('group-members-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'group_members' },
-        async (payload: RealtimePostgresChangesPayload<any>) => {
-          console.log('Group members change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            setGroups((prev) =>
-              prev.map((g) =>
-                g.id === payload.new.group_id
-                  ? {
-                      ...g,
-                      members: [...g.members, payload.new.member_name],
-                    }
-                  : g
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setGroups((prev) =>
-              prev.map((g) =>
-                g.id === payload.old.group_id
-                  ? {
-                      ...g,
-                      members: g.members.filter((m) => m !== payload.old.member_name),
-                    }
-                  : g
-              )
-            );
-          }
-        }
-      )
-      .subscribe();
+          return group;
+        }),
+      );
+    },
+    onDelete: (payload) => {
+      const oldRow = payload.old as {
+        group_id: string;
+        member_name: string;
+      } | null;
 
-    // Cleanup subscriptions on unmount
-    return () => {
-      console.log('Cleaning up real-time subscriptions...');
-      subjectsChannel.unsubscribe();
-      studentsChannel.unsubscribe();
-      groupingsChannel.unsubscribe();
-      groupsChannel.unsubscribe();
-      groupMembersChannel.unsubscribe();
-    };
-  }, [loading, dbError]);
+      if (!oldRow) {
+        return;
+      }
+
+      setGroups((prev) =>
+        prev.map((group) =>
+          group.id === oldRow.group_id
+            ? {
+                ...group,
+                members: group.members.filter((member) => member !== oldRow.member_name),
+              }
+            : group,
+        ),
+      );
+    },
+  });
 
   const loadAllData = async () => {
     setLoading(true);

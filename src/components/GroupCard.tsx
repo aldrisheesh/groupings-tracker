@@ -111,7 +111,11 @@ export function GroupCard({
       return;
     }
 
-    if (group.members.some(m => normalizeForMatching(m) === normalizeForMatching(memberName.trim()))) {
+    if (
+      group.members.some(
+        (m) => normalizeForMatching(m.name) === normalizeForMatching(memberName.trim()),
+      )
+    ) {
       toast.error("You are already a member of this group");
       return;
     }
@@ -160,8 +164,10 @@ export function GroupCard({
     }
 
     // Check if any names are already members
-    const alreadyMembers = names.filter(name => 
-      group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
+    const alreadyMembers = names.filter((name) =>
+      group.members.some(
+        (m) => normalizeForMatching(m.name) === normalizeForMatching(name),
+      ),
     );
     if (alreadyMembers.length > 0) {
       toast.error(`Already a member: ${alreadyMembers[0]}`);
@@ -288,14 +294,15 @@ export function GroupCard({
             </p>
             <ul className="space-y-1">
               {[...group.members]
-                .sort((a, b) => a.localeCompare(b))
-                .map((member, index) => {
-                const isRepresentative = group.representative === member;
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((member) => {
+                const isRepresentative = group.representative === member.name;
                 return (
-                  <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
+                  <li key={member.id} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
-                      <span className="flex-1 min-w-0 truncate">{member}</span>
+                      <span className="flex-1 min-w-0 truncate">{member.name}</span>
                       {isRepresentative && (
                         <TooltipProvider>
                           <Tooltip>
@@ -321,7 +328,7 @@ export function GroupCard({
                               variant="ghost"
                               size="icon"
                               className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
-                              onClick={() => handleToggleRepresentative(member)}
+                              onClick={() => handleToggleRepresentative(member.name)}
                             >
                               <Crown className="w-3 h-3" />
                             </Button>
@@ -336,7 +343,7 @@ export function GroupCard({
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 dark:hover:bg-slate-800"
-                          onClick={() => handleRemoveMember(member)}
+                          onClick={() => handleRemoveMember(member.name)}
                         >
                           <X className="w-3 h-3 text-red-600 dark:text-red-400" />
                         </Button>

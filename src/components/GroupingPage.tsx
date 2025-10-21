@@ -43,8 +43,8 @@ export function GroupingPage({
 
   const handleJoinGroup = (groupId: string, memberName: string) => {
     // Check if member is already in another group
-    const existingGroup = groups.find(g => 
-      g.members.some(m => m.toLowerCase() === memberName.toLowerCase())
+    const existingGroup = groups.find((g) =>
+      g.members.some((m) => m.name.toLowerCase() === memberName.toLowerCase()),
     );
 
     if (existingGroup) {

@@ -234,7 +234,7 @@ export function GroupCard({
     <>
       {/* Main Group Card */}
       <Card 
-        className={`hover:shadow-lg transition-shadow dark:border-slate-800 ${
+        className={`flex flex-col h-full gap-0 hover:shadow-lg transition-shadow dark:border-slate-800 ${
           isFull 
             ? "border-slate-300 dark:border-slate-700 dark:bg-slate-900" 
             : "border-indigo-200 dark:border-indigo-900 dark:bg-slate-900 shadow-md dark:shadow-slate-900/50"
@@ -313,7 +313,7 @@ export function GroupCard({
                         </TooltipProvider>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>

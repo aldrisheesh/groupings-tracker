@@ -16,8 +16,15 @@ interface GroupingPageProps {
   onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => void;
   onJoinGroup: (groupId: string, memberName: string) => void;
   onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
-  onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
-  onRemoveMember: (groupId: string, memberName: string) => void;
+  onUpdateGroup: (
+    groupId: string,
+    updatedGroup: {
+      name?: string;
+      memberLimit?: number;
+      representative?: string | null;
+    },
+  ) => void;
+  onRemoveMember: (groupId: string, memberId: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onBack: () => void;
   isAdmin: boolean;
@@ -43,8 +50,8 @@ export function GroupingPage({
 
   const handleJoinGroup = (groupId: string, memberName: string) => {
     // Check if member is already in another group
-    const existingGroup = groups.find(g => 
-      g.members.some(m => m.toLowerCase() === memberName.toLowerCase())
+    const existingGroup = groups.find(g =>
+      g.members.some(m => m.name.toLowerCase() === memberName.toLowerCase())
     );
 
     if (existingGroup) {

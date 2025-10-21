@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Users, Edit2, Trash2, X, Crown, UsersRound } from "lucide-react";
-import { Group, Student } from "../App";
+import { Group, GroupMember, Student } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
@@ -26,8 +26,15 @@ interface GroupCardProps {
   students: Student[];
   onJoinGroup: (groupId: string, memberName: string) => void;
   onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
-  onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
-  onRemoveMember: (groupId: string, memberName: string) => void;
+  onUpdateGroup: (
+    groupId: string,
+    updatedGroup: {
+      name?: string;
+      memberLimit?: number;
+      representative?: string | null;
+    },
+  ) => void;
+  onRemoveMember: (groupId: string, memberId: string) => void;
   onDeleteGroup: (groupId: string) => void;
   isAdmin: boolean;
   isLocked: boolean;
@@ -111,7 +118,7 @@ export function GroupCard({
       return;
     }
 
-    if (group.members.some(m => normalizeForMatching(m) === normalizeForMatching(memberName.trim()))) {
+    if (group.members.some(m => normalizeForMatching(m.name) === normalizeForMatching(memberName.trim()))) {
       toast.error("You are already a member of this group");
       return;
     }
@@ -160,8 +167,8 @@ export function GroupCard({
     }
 
     // Check if any names are already members
-    const alreadyMembers = names.filter(name => 
-      group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
+    const alreadyMembers = names.filter(name =>
+      group.members.some(m => normalizeForMatching(m.name) === normalizeForMatching(name))
     );
     if (alreadyMembers.length > 0) {
       toast.error(`Already a member: ${alreadyMembers[0]}`);
@@ -182,19 +189,19 @@ export function GroupCard({
     toast.success(`Successfully added ${names.length} member(s)`);
   };
 
-  const handleRemoveMember = (memberName: string) => {
-    onRemoveMember(group.id, memberName);
+  const handleRemoveMember = (member: GroupMember) => {
+    onRemoveMember(group.id, member.id);
   };
 
-  const handleToggleRepresentative = (memberName: string) => {
-    if (group.representative === memberName) {
+  const handleToggleRepresentative = (member: GroupMember) => {
+    if (group.representative === member.name) {
       // Remove representative
       onUpdateGroup(group.id, { representative: null });
       toast.success("Representative removed");
     } else {
       // Set new representative
-      onUpdateGroup(group.id, { representative: memberName });
-      toast.success(`${memberName} is now the group representative`);
+      onUpdateGroup(group.id, { representative: member.name });
+      toast.success(`${member.name} is now the group representative`);
     }
   };
 
@@ -288,24 +295,24 @@ export function GroupCard({
             </p>
             <ul className="space-y-1">
               {[...group.members]
-                .sort((a, b) => a.localeCompare(b))
-                .map((member, index) => {
-                const isRepresentative = group.representative === member;
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((member) => {
+                const isRepresentative = group.representative === member.name;
                 return (
-                  <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
+                  <li key={member.id} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
-                      <span className="flex-1 min-w-0 truncate">{member}</span>
+                      <span className="flex-1 min-w-0 truncate">{member.name}</span>
                       {isRepresentative && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="inline-flex">
                                 <Badge className="bg-amber-500 hover:bg-amber-500 dark:bg-amber-600 dark:hover:bg-amber-600 flex-shrink-0">
-                                  <Crown className="w-3 h-3" />
-                                </Badge>
-                              </span>
-                            </TooltipTrigger>
+                              <Crown className="w-3 h-3" />
+                            </Badge>
+                          </span>
+                        </TooltipTrigger>
                             <TooltipContent>
                               <p>Group Representative</p>
                             </TooltipContent>

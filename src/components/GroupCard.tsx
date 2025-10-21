@@ -298,7 +298,9 @@ export function GroupCard({
               Members ({group.members.length}/{group.memberLimit}):
             </p>
             <ul className="space-y-1">
-              {group.members.map((member, index) => {
+              {[...group.members]
+                .sort((a, b) => a.localeCompare(b))
+                .map((member, index) => {
                 const isRepresentative = group.representative === member;
                 return (
                   <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">

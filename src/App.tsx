@@ -498,32 +498,13 @@ function App() {
         }),
       );
     },
-    onDelete: async (payload) => {
+    onDelete: (payload) => {
       const oldRow = payload.old as {
         group_id: string;
-        member_name?: string | null;
+        member_name: string;
       } | null;
 
-      if (!oldRow?.group_id) {
-        return;
-      }
-
-      if (oldRow.member_name) {
-        setGroups((prev) =>
-          prev.map((group) =>
-            group.id === oldRow.group_id
-              ? {
-                  ...group,
-                  members: group.members.filter((member) => member !== oldRow.member_name),
-                }
-              : group,
-          ),
-        );
-        return;
-      }
-
-      const members = await db.fetchGroupMembers(oldRow.group_id);
-      if (!members) {
+      if (!oldRow) {
         return;
       }
 
@@ -532,7 +513,7 @@ function App() {
           group.id === oldRow.group_id
             ? {
                 ...group,
-                members,
+                members: group.members.filter((member) => member !== oldRow.member_name),
               }
             : group,
         ),
@@ -824,8 +805,8 @@ function App() {
       memberName,
     );
     if (success) {
-      setGroups((prev) =>
-        prev.map((g) =>
+      setGroups(
+        groups.map((g) =>
           g.id === groupId
             ? {
                 ...g,

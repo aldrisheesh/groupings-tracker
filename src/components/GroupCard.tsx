@@ -34,8 +34,9 @@ interface GroupCardProps {
 }
 
 // Helper function to validate name format: Last Name, First Name
+// Supports Unicode letters (ñ, á, é, etc.), hyphens, and apostrophes
 const validateNameFormat = (name: string): boolean => {
-  const regex = /^[A-Za-z\s]+,\s*[A-Za-z\s]+$/;
+  const regex = /^[\p{L}\s'-]+,\s*[\p{L}\s'-]+$/u;
   return regex.test(name.trim());
 };
 
@@ -99,15 +100,17 @@ export function GroupCard({
     }
 
     if (!validateNameFormat(memberName)) {
-      toast.error("Please use the format: Last Name, First Name (e.g., Santos, Roi Aldrich)");
+      toast.error("Please use the format: Last Name, First Name");
       return;
     }
 
-    // Check if name is in enrolled students list
-    const isEnrolled = fuzzyMatchStudent(memberName, students);
-    
-    if (!isEnrolled) {
-      toast.error("You must be enrolled in this subject to join a group. Please contact Santos, Roi Aldrich.");
+    if (!fuzzyMatchStudent(memberName, students)) {
+      toast.error("Name not found in enrolled students list");
+      return;
+    }
+
+    if (group.members.some(m => normalizeForMatching(m) === normalizeForMatching(memberName.trim()))) {
+      toast.error("You are already a member of this group");
       return;
     }
 
@@ -117,135 +120,121 @@ export function GroupCard({
     }
 
     onJoinGroup(group.id, memberName.trim());
-    setIsJoinDialogOpen(false);
     setMemberName("");
+    setIsJoinDialogOpen(false);
   };
 
-  // Batch member add (for admin)
+  // Batch add members (for admin)
   const handleBatchAddMembers = () => {
+    if (!batchMemberNames.trim()) {
+      toast.error("Please enter at least one name");
+      return;
+    }
+
     const names = batchMemberNames
       .split('\n')
       .map(name => name.trim())
       .filter(name => name.length > 0);
 
-    if (names.length === 0) {
-      toast.error("Please enter at least one member name");
+    // Validate all names first
+    const invalidNames = names.filter(name => !validateNameFormat(name));
+    if (invalidNames.length > 0) {
+      toast.error(`Invalid name format: ${invalidNames[0]}\nPlease use: Last Name, First Name`);
       return;
     }
 
-    const validNames: string[] = [];
-    const invalidNames: string[] = [];
-    const duplicateNames: string[] = [];
-    
-    names.forEach(name => {
-      // Check format
-      if (!validateNameFormat(name)) {
-        invalidNames.push(name);
-        return;
-      }
-      
-      // Check if already in the group
-      const existsInGroup = group.members.some(m => m.toLowerCase() === name.toLowerCase());
-      // Check if duplicate within the batch itself
-      const existsInBatch = validNames.some(n => n.toLowerCase() === name.toLowerCase());
-      
-      if (existsInGroup || existsInBatch) {
-        duplicateNames.push(name);
-        return;
-      }
-      
-      validNames.push(name);
-    });
+    // Check if names are in enrolled students list
+    const notEnrolled = names.filter(name => !fuzzyMatchStudent(name, students));
+    if (notEnrolled.length > 0) {
+      toast.error(`Name not found in enrolled students: ${notEnrolled[0]}`);
+      return;
+    }
+
+    // Check for duplicates within input
+    const uniqueNames = new Set(names.map(normalizeForMatching));
+    if (uniqueNames.size !== names.length) {
+      toast.error("Duplicate names found in the list");
+      return;
+    }
+
+    // Check if any names are already members
+    const alreadyMembers = names.filter(name => 
+      group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
+    );
+    if (alreadyMembers.length > 0) {
+      toast.error(`Already a member: ${alreadyMembers[0]}`);
+      return;
+    }
 
     // Check if adding would exceed member limit
-    if (group.members.length + validNames.length > group.memberLimit) {
-      toast.error(`Cannot add ${validNames.length} members. Only ${group.memberLimit - group.members.length} spots available.`);
+    if (group.members.length + names.length > group.memberLimit) {
+      toast.error(`Cannot add ${names.length} members. Only ${group.memberLimit - group.members.length} spot(s) available.`);
       return;
     }
 
-    // Add all valid members
-    if (validNames.length > 0) {
-      const updatedMembers = [...group.members, ...validNames];
-      onUpdateGroup(group.id, { members: updatedMembers });
-      
-      // Show results
-      const results: string[] = [];
-      results.push(`✓ ${validNames.length} member${validNames.length > 1 ? 's' : ''} added successfully`);
-      if (invalidNames.length > 0) {
-        results.push(`⚠ ${invalidNames.length} invalid format${invalidNames.length > 1 ? 's' : ''}`);
-      }
-      if (duplicateNames.length > 0) {
-        results.push(`⚠ ${duplicateNames.length} duplicate${duplicateNames.length > 1 ? 's' : ''} skipped`);
-      }
-      
-      toast.success(results.join('\n'));
-      setBatchMemberNames("");
-      setIsJoinDialogOpen(false);
-    } else {
-      toast.error("No valid members to add\n" + 
-        (invalidNames.length > 0 ? `Invalid format: ${invalidNames.length}\n` : '') +
-        (duplicateNames.length > 0 ? `Duplicates: ${duplicateNames.length}` : '')
-      );
-    }
-  };
-
-  const handleUpdateGroup = () => {
-    if (!editGroupName.trim()) {
-      toast.error("Please enter a group name");
-      return;
-    }
-
-    const limit = parseInt(editMemberLimit);
-    if (isNaN(limit) || limit < 1) {
-      toast.error("Please enter a valid member limit (at least 1)");
-      return;
-    }
-
-    if (limit < group.members.length) {
-      toast.error(`Member limit cannot be less than current member count (${group.members.length})`);
-      return;
-    }
-
-    onUpdateGroup(group.id, {
-      name: editGroupName.trim(),
-      memberLimit: limit,
+    // Add all members
+    names.forEach(name => {
+      onJoinGroup(group.id, name);
     });
-    toast.success("Group updated successfully!");
-    setIsEditDialogOpen(false);
+
+    setBatchMemberNames("");
+    setIsJoinDialogOpen(false);
+    toast.success(`Successfully added ${names.length} member(s)`);
   };
 
   const handleRemoveMember = (memberName: string) => {
-    // If removing the representative, clear the representative field
-    if (group.representative === memberName) {
-      onUpdateGroup(group.id, { representative: undefined });
-    }
     onRemoveMember(group.id, memberName);
-    toast.success(`Removed ${memberName} from ${group.name}`);
   };
 
   const handleToggleRepresentative = (memberName: string) => {
     if (group.representative === memberName) {
-      // Unmark as representative
-      onUpdateGroup(group.id, { representative: undefined });
-      toast.success(`${memberName} is no longer the group representative`);
+      // Remove representative
+      onUpdateGroup(group.id, { representative: null });
+      toast.success("Representative removed");
     } else {
-      // Mark as representative
+      // Set new representative
       onUpdateGroup(group.id, { representative: memberName });
       toast.success(`${memberName} is now the group representative`);
     }
   };
 
+  const handleUpdateGroup = () => {
+    if (!editGroupName.trim()) {
+      toast.error("Group name cannot be empty");
+      return;
+    }
+
+    const newLimit = parseInt(editMemberLimit);
+    if (isNaN(newLimit) || newLimit < 1) {
+      toast.error("Member limit must be at least 1");
+      return;
+    }
+
+    if (newLimit < group.members.length) {
+      toast.error(`Cannot set limit below current member count (${group.members.length})`);
+      return;
+    }
+
+    onUpdateGroup(group.id, {
+      name: editGroupName.trim(),
+      memberLimit: newLimit,
+    });
+
+    setIsEditDialogOpen(false);
+    toast.success("Group updated successfully");
+  };
+
   const handleDeleteGroup = () => {
     onDeleteGroup(group.id);
-    toast.success(`${group.name} has been deleted`);
     setIsDeleteDialogOpen(false);
+    toast.success("Group deleted successfully");
   };
 
   return (
     <>
+      {/* Main Group Card */}
       <Card 
-        id={`group-${group.id}`}
-        className={`flex flex-col h-full gap-0 ${ 
+        className={`hover:shadow-lg transition-shadow dark:border-slate-800 ${
           isFull 
             ? "border-slate-300 dark:border-slate-700 dark:bg-slate-900" 
             : "border-indigo-200 dark:border-indigo-900 dark:bg-slate-900 shadow-md dark:shadow-slate-900/50"
@@ -375,63 +364,49 @@ export function GroupCard({
         </CardFooter>
       </Card>
 
-      {/* Join/Add Members Dialog */}
+      {/* Join Group / Add Members Dialog */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
-        <DialogContent className="w-[calc(100%-2rem)] mx-4 dark:bg-slate-900 dark:border-slate-800">
+        <DialogContent className="dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="dark:text-slate-100">
-              {isAdmin ? `Add Members to ${group.name}` : `Join ${group.name}`}
+              {isAdmin ? "Add Members to Group" : "Join Group"}
             </DialogTitle>
             <DialogDescription className="dark:text-slate-400">
               {isAdmin 
-                ? "Add multiple members at once (one per line)"
+                ? "Add one or multiple members to the group. Enter one name per line."
                 : "Enter your name to join this group."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4">
             {isAdmin ? (
-              // Admin: Batch add with textarea
-              <div className="space-y-2">
-                <Label htmlFor="batch-members">Member Names (One per Line)</Label>
-                <Textarea
-                  id="batch-members"
-                  value={batchMemberNames}
-                  onChange={(e) => setBatchMemberNames(e.target.value)}
-                  placeholder="Santos, Roi Aldrich&#10;Chen, Alice&#10;Smith, Bob&#10;Zhang, Carol"
-                  className="min-h-[200px] font-mono"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      handleBatchAddMembers();
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-slate-500 dark:text-slate-500">
-                    Format: Last Name, First Name (one per line)
-                    <span className="block mt-1">Press Ctrl+Enter to add all</span>
-                  </p>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    Available: {group.memberLimit - group.members.length} spots
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="batchMembers" className="dark:text-slate-200">Member Names (one per line)</Label>
+                  <Textarea
+                    id="batchMembers"
+                    value={batchMemberNames}
+                    onChange={(e) => setBatchMemberNames(e.target.value)}
+                    placeholder="Garcia, Maria&#10;Lopez, Carlos&#10;Saim, Niña Zairamar"
+                    className="min-h-[150px] dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Format: Last Name, First Name
                   </p>
                 </div>
-              </div>
+              </>
             ) : (
-              // Regular user: Single input
               <div className="space-y-2">
-                <Label htmlFor="member-name">Your Name</Label>
+                <Label htmlFor="memberName" className="dark:text-slate-200">Your Name</Label>
                 <Input
-                  id="member-name"
+                  id="memberName"
                   value={memberName}
                   onChange={(e) => setMemberName(e.target.value)}
-                  placeholder="Last Name, First Name (e.g., Lopez, Carlos)"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleJoinGroup();
-                    }
-                  }}
+                  placeholder="Santos, Roi Aldrich"
+                  className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                 />
-                <p className="text-slate-500 dark:text-slate-500">Format: Last Name, First Name</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Format: Last Name, First Name
+                </p>
               </div>
             )}
           </div>
@@ -440,92 +415,83 @@ export function GroupCard({
               setIsJoinDialogOpen(false);
               setMemberName("");
               setBatchMemberNames("");
-            }}>
+            }} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">
               Cancel
             </Button>
             <Button 
-              onClick={isAdmin ? handleBatchAddMembers : handleJoinGroup} 
-              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              onClick={isAdmin ? handleBatchAddMembers : handleJoinGroup}
+              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >
-              {isAdmin ? (
-                <>
-                  <UsersRound className="w-4 h-4 mr-2" />
-                  Add Members
-                </>
-              ) : (
-                "Join Group"
-              )}
+              {isAdmin ? "Add Members" : "Join"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Group Dialog (Admin Only) */}
-      {isAdmin && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="w-[calc(100%-2rem)] mx-4 dark:bg-slate-900 dark:border-slate-800">
-            <DialogHeader>
-              <DialogTitle className="dark:text-slate-100">Edit Group</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">
-                Update the group name or member limit.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-group-name">Group Name</Label>
-                <Input
-                  id="edit-group-name"
-                  value={editGroupName}
-                  onChange={(e) => setEditGroupName(e.target.value)}
-                  placeholder="e.g., Group Delta"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-member-limit">Member Limit</Label>
-                <Input
-                  id="edit-member-limit"
-                  type="number"
-                  min="1"
-                  value={editMemberLimit}
-                  onChange={(e) => setEditMemberLimit(e.target.value)}
-                  placeholder="e.g., 5"
-                />
-              </div>
+      {/* Edit Group Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="dark:bg-slate-900 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-slate-100">Edit Group</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">
+              Update the group name or member limit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editGroupName" className="dark:text-slate-200">Group Name</Label>
+              <Input
+                id="editGroupName"
+                value={editGroupName}
+                onChange={(e) => setEditGroupName(e.target.value)}
+                placeholder="Group 1"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateGroup} className="bg-indigo-600 hover:bg-indigo-700">
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="editMemberLimit" className="dark:text-slate-200">Member Limit</Label>
+              <Input
+                id="editMemberLimit"
+                type="number"
+                min="1"
+                value={editMemberLimit}
+                onChange={(e) => setEditMemberLimit(e.target.value)}
+                placeholder="5"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Current members: {group.members.length}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateGroup} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600">
+              Update Group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Group Dialog (Admin Only) */}
-      {isAdmin && (
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete "{group.name}" and remove all {group.members.length} members. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteGroup}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Delete Group
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* Delete Group Confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="dark:bg-slate-900 dark:border-slate-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="dark:text-slate-100">Delete Group</AlertDialogTitle>
+            <AlertDialogDescription className="dark:text-slate-400">
+              Are you sure you want to delete "{group.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteGroup} className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

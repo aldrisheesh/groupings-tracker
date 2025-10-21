@@ -647,16 +647,8 @@ function App() {
     subjectId: string,
     studentId: string,
   ) => {
-    const subject = subjects.find((s) => s.id === subjectId);
-    const studentToRemove = subject?.students.find(
-      (student) => student.id === studentId,
-    );
-    const studentName = studentToRemove?.name;
-    const success = await db.removeStudentFromSubject(
-      studentId,
-      subjectId,
-      studentName,
-    );
+    const success =
+      await db.removeStudentFromSubject(studentId);
     if (success) {
       setSubjects(
         subjects.map((s) =>
@@ -670,47 +662,6 @@ function App() {
             : s,
         ),
       );
-      if (studentName) {
-        const groupingIdsForSubject = new Set(
-          groupings
-            .filter((grouping) => grouping.subjectId === subjectId)
-            .map((grouping) => grouping.id),
-        );
-
-        setGroups((prev) =>
-          prev.map((group) => {
-            if (!groupingIdsForSubject.has(group.groupingId)) {
-              return group;
-            }
-
-            const updatedMembers = group.members.filter(
-              (member) => member !== studentName,
-            );
-            const wasRepresentative = group.representative === studentName;
-
-            if (
-              updatedMembers.length === group.members.length &&
-              !wasRepresentative
-            ) {
-              return group;
-            }
-
-            const updatedGroup: Group = {
-              ...group,
-              members: updatedMembers,
-            };
-
-            if (wasRepresentative) {
-              return {
-                ...updatedGroup,
-                representative: undefined,
-              };
-            }
-
-            return updatedGroup;
-          }),
-        );
-      }
     } else {
       toast.error("Failed to remove student");
     }

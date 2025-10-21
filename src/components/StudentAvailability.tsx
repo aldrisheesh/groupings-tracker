@@ -14,9 +14,13 @@ interface StudentAvailabilityProps {
 
 // Fuzzy matching: normalize name for comparison
 // "Santos, Roi" should match "Santos, Roi Aldrich" or "Santos, Roi Aldrich S."
+// Also supports accent-insensitive matching: "Bañares" matches "Banares"
 const normalizeNameForMatching = (name: string): string => {
-  // Remove extra spaces and convert to lowercase
-  return name.trim().toLowerCase();
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritical marks
 };
 
 const fuzzyMatch = (studentName: string, memberName: string): boolean => {
@@ -51,12 +55,13 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   );
 
   // Separate available and unavailable students
-  const availableStudents = filteredStudents.filter(
-    student => !studentsInGroups.has(student.name)
-  );
-  const unavailableStudents = filteredStudents.filter(
-    student => studentsInGroups.has(student.name)
-  );
+  const availableStudents = filteredStudents
+    .filter(student => !studentsInGroups.has(student.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const unavailableStudents = filteredStudents
+    .filter(student => studentsInGroups.has(student.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Find which group a student belongs to
   const findStudentGroup = (studentName: string): string | null => {

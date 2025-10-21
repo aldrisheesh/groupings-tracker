@@ -20,8 +20,9 @@ interface StudentManagementProps {
 }
 
 // Helper function to validate name format: Last Name, First Name
+// Supports Unicode letters (including ñ, á, é, etc.), hyphens, apostrophes, and spaces
 const validateNameFormat = (name: string): boolean => {
-  const regex = /^[A-Za-z\s]+,\s*[A-Za-z\s]+$/;
+  const regex = /^[\p{L}\s'-]+,\s*[\p{L}\s'-]+$/u;
   return regex.test(name.trim());
 };
 
@@ -145,7 +146,7 @@ export function StudentManagement({ subjectId, students, onAddStudent, onBatchAd
                 id="student-name"
                 value={newStudentName}
                 onChange={(e) => setNewStudentName(e.target.value)}
-                placeholder="Last Name, First Name (e.g., Santos, Roi)"
+                placeholder="Last Name, First Name (e.g., Garcia, Maria)"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleAddStudent();
@@ -169,7 +170,7 @@ export function StudentManagement({ subjectId, students, onAddStudent, onBatchAd
               id="batch-student-names"
               value={batchStudentNames}
               onChange={(e) => setBatchStudentNames(e.target.value)}
-              placeholder="Santos, Roi Aldrich&#10;Chen, Alice&#10;Smith, Bob&#10;Zhang, Carol"
+              placeholder="Alvarez, Juan Carlos&#10;Cruz, Sophia Mae&#10;Fernandez, Diego&#10;Reyes, Isabella"
               className="min-h-[150px] font-mono"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -203,22 +204,24 @@ export function StudentManagement({ subjectId, students, onAddStudent, onBatchAd
             </div>
             <ScrollArea className="h-[300px] border border-slate-200 dark:border-slate-700 rounded-lg p-3">
               <div className="space-y-2">
-                {students.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-                  >
-                    <span className="text-slate-700 dark:text-slate-300">{student.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-slate-700"
-                      onClick={() => handleRemoveStudent(student.id)}
+                {[...students]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((student) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                     >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <span className="text-slate-700 dark:text-slate-300">{student.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-slate-700"
+                        onClick={() => handleRemoveStudent(student.id)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
               </div>
             </ScrollArea>
           </div>

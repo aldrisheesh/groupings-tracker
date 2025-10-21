@@ -39,21 +39,31 @@ const validateNameFormat = (name: string): boolean => {
   return regex.test(name.trim());
 };
 
+// Helper function to normalize text for accent-insensitive matching
+// Converts "Bañares" to "banares", "José" to "jose", etc.
+const normalizeForMatching = (text: string): string => {
+  return text
+    .toLowerCase()
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritical marks
+};
+
 // Helper function for fuzzy matching enrolled students
 // Matches if last names match and input first name is contained in enrolled first name
+// Supports accent-insensitive matching (ñ matches n, á matches a, etc.)
 const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
-  const inputParts = inputName.trim().split(',').map(part => part.trim().toLowerCase());
+  const inputParts = inputName.trim().split(',').map(part => part.trim());
   if (inputParts.length !== 2) return false;
   
-  const [inputLastName, inputFirstName] = inputParts;
+  const [inputLastName, inputFirstName] = inputParts.map(normalizeForMatching);
   
   return students.some(student => {
-    const studentParts = student.name.trim().split(',').map(part => part.trim().toLowerCase());
+    const studentParts = student.name.trim().split(',').map(part => part.trim());
     if (studentParts.length !== 2) return false;
     
-    const [studentLastName, studentFirstName] = studentParts;
+    const [studentLastName, studentFirstName] = studentParts.map(normalizeForMatching);
     
-    // Last names must match exactly
+    // Last names must match (accent-insensitive)
     // First name: input must be contained in or equal to the enrolled name
     return studentLastName === inputLastName && 
            studentFirstName.includes(inputFirstName);
@@ -412,7 +422,7 @@ export function GroupCard({
                   id="member-name"
                   value={memberName}
                   onChange={(e) => setMemberName(e.target.value)}
-                  placeholder="Last Name, First Name (e.g., Santos, Roi Aldrich)"
+                  placeholder="Last Name, First Name (e.g., Lopez, Carlos)"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       handleJoinGroup();

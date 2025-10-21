@@ -300,6 +300,20 @@ export async function fetchGroups(): Promise<Group[]> {
   }));
 }
 
+export async function fetchGroupMembers(groupId: string): Promise<string[] | null> {
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('member_name')
+    .eq('group_id', groupId);
+
+  if (error) {
+    console.error('Error fetching group members:', error);
+    return null;
+  }
+
+  return data?.map(member => member.member_name) ?? [];
+}
+
 export async function createGroup(groupingId: string, name: string, memberLimit: number): Promise<Group | null> {
   const newGroup = {
     id: crypto.randomUUID(),

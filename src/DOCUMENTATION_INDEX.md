@@ -31,6 +31,7 @@ Your complete guide to the Groupings Tracker project.
 |----------|---------|----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | How everything fits together | Developers |
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | Database structure and queries | Developers |
+| [REALTIME_UPDATES.md](./REALTIME_UPDATES.md) | Real-time sync for concurrent users | Developers |
 
 ### For Daily Use
 
@@ -146,6 +147,7 @@ Your complete guide to the Groupings Tracker project.
 ├── SUPABASE_SETUP.md            # Detailed Supabase guide
 ├── DATABASE_SCHEMA.md           # Database structure
 ├── ARCHITECTURE.md              # System architecture
+├── REALTIME_UPDATES.md          # Real-time sync guide
 ├── QUICK_REFERENCE.md           # Common commands
 └── DOCUMENTATION_INDEX.md       # This file
 ```
@@ -200,6 +202,9 @@ supabase/
 
 **Understand the database**
 → [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
+
+**Understand real-time sync**
+→ [REALTIME_UPDATES.md](./REALTIME_UPDATES.md)
 
 **Find a command or snippet**
 → [QUICK_REFERENCE.md](./QUICK_REFERENCE.md)
@@ -267,9 +272,10 @@ supabase/
 | SUPABASE_SETUP.md | ~8 | Intermediate | Database, connection, deployment |
 | DATABASE_SCHEMA.md | ~8 | Advanced | Tables, queries, optimization |
 | ARCHITECTURE.md | ~12 | Advanced | System design, data flow |
+| REALTIME_UPDATES.md | ~5 | Intermediate | Real-time sync, concurrency |
 | QUICK_REFERENCE.md | ~10 | All levels | Commands, snippets, tips |
 
-**Total:** ~70 pages of documentation 📚
+**Total:** ~75 pages of documentation 📚
 
 ---
 

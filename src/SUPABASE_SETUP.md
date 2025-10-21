@@ -55,6 +55,25 @@ You're transforming your app from client-side only to a full-stack application w
    - `group_members`
 3. Click on each table to see the sample data that was inserted
 
+### Step 3.5: Enable Real-Time Updates (Required)
+
+To enable instant synchronization across all users:
+
+1. Go back to **SQL Editor** in Supabase
+2. Click **"New Query"**
+3. Copy and paste the contents of `/supabase/migrations/002_enable_realtime.sql`:
+   ```sql
+   ALTER PUBLICATION supabase_realtime ADD TABLE subjects;
+   ALTER PUBLICATION supabase_realtime ADD TABLE students;
+   ALTER PUBLICATION supabase_realtime ADD TABLE groupings;
+   ALTER PUBLICATION supabase_realtime ADD TABLE groups;
+   ALTER PUBLICATION supabase_realtime ADD TABLE group_members;
+   ```
+4. Click **"Run"**
+5. You should see: "Success. No rows returned"
+
+This enables real-time broadcasting on all tables so changes appear instantly for all connected users without refreshing.
+
 ### Step 4: Get Your Supabase Credentials
 
 1. Click **"Settings"** (gear icon) in the left sidebar
@@ -119,10 +138,11 @@ vercel
    - Create groups
    - Add members to groups
    - Lock a grouping
-4. **Multi-user test**:
+4. **Real-time multi-user test**:
    - Open the app in a different browser or incognito window
-   - Make a change in one window
-   - Refresh the other window - you should see the changes!
+   - Make a change in one window (e.g., add a student)
+   - **Watch the other window update instantly WITHOUT refreshing!**
+   - This confirms real-time sync is working
 
 ---
 

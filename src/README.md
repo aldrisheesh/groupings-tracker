@@ -41,10 +41,12 @@ A modern, clean, and minimal dashboard-style web app for managing student groups
 - Keyboard shortcuts (Enter to submit, Ctrl+Enter for batch)
 - Accessible UI components (shadcn/ui)
 
-### 💾 Data Persistence
+### 💾 Data Persistence & Real-Time
 - Supabase PostgreSQL database
-- Multi-user support with real-time sync
-- Lock states work across all users
+- **Real-time sync across all connected users**
+- **Instant updates without page refresh**
+- **Supports 50+ concurrent users**
+- Lock states work across all users instantly
 - No data loss on page reload
 - Automatic cascading deletes
 

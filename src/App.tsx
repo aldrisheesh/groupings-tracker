@@ -6,6 +6,8 @@ import { GroupingPage } from "./components/GroupingPage";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import * as db from "./utils/supabase/database";
+import { supabase } from "./utils/supabase/client";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 export type Subject = {
   id: string;
@@ -66,6 +68,188 @@ function App() {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (loading || dbError) return;
+
+    console.log('Setting up real-time subscriptions...');
+
+    // Subscribe to subjects table
+    const subjectsChannel = supabase
+      .channel('subjects-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subjects' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Subjects change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newSubject = await db.fetchSubjects();
+            const inserted = newSubject.find((s: Subject) => s.id === payload.new.id);
+            if (inserted) {
+              setSubjects((prev) => {
+                if (prev.some(s => s.id === inserted.id)) return prev;
+                return [...prev, inserted];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedSubjects = await db.fetchSubjects();
+            const updated = updatedSubjects.find((s: Subject) => s.id === payload.new.id);
+            if (updated) {
+              setSubjects((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            setSubjects((prev) => prev.filter((s) => s.id !== payload.old.id));
+            setGroupings((prev) => prev.filter((g) => g.subjectId !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to students table
+    const studentsChannel = supabase
+      .channel('students-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students' },
+        async () => {
+          console.log('Students change received, reloading subjects...');
+          // Reload all subjects to get updated students
+          const updatedSubjects = await db.fetchSubjects();
+          setSubjects(updatedSubjects);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to groupings table
+    const groupingsChannel = supabase
+      .channel('groupings-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'groupings' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Groupings change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newGrouping: Grouping = {
+              id: payload.new.id,
+              subjectId: payload.new.subject_id,
+              title: payload.new.title,
+              locked: payload.new.locked,
+            };
+            setGroupings((prev) => {
+              if (prev.some(g => g.id === newGrouping.id)) return prev;
+              return [...prev, newGrouping];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setGroupings((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.id
+                  ? {
+                      ...g,
+                      title: payload.new.title,
+                      locked: payload.new.locked,
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroupings((prev) => prev.filter((g) => g.id !== payload.old.id));
+            setGroups((prev) => prev.filter((gr) => gr.groupingId !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to groups table
+    const groupsChannel = supabase
+      .channel('groups-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'groups' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Groups change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newGroup: Group = {
+              id: payload.new.id,
+              groupingId: payload.new.grouping_id,
+              name: payload.new.name,
+              members: [],
+              memberLimit: payload.new.member_limit,
+              representative: payload.new.representative || undefined,
+            };
+            setGroups((prev) => {
+              if (prev.some(g => g.id === newGroup.id)) return prev;
+              return [...prev, newGroup];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.id
+                  ? {
+                      ...g,
+                      name: payload.new.name,
+                      memberLimit: payload.new.member_limit,
+                      representative: payload.new.representative || undefined,
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroups((prev) => prev.filter((g) => g.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to group_members table
+    const groupMembersChannel = supabase
+      .channel('group-members-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_members' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Group members change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.group_id
+                  ? {
+                      ...g,
+                      members: [...g.members, payload.new.member_name],
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.old.group_id
+                  ? {
+                      ...g,
+                      members: g.members.filter((m) => m !== payload.old.member_name),
+                    }
+                  : g
+              )
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      console.log('Cleaning up real-time subscriptions...');
+      subjectsChannel.unsubscribe();
+      studentsChannel.unsubscribe();
+      groupingsChannel.unsubscribe();
+      groupsChannel.unsubscribe();
+      groupMembersChannel.unsubscribe();
+    };
+  }, [loading, dbError]);
 
   const loadAllData = async () => {
     setLoading(true);

@@ -530,23 +530,25 @@ function App() {
     },
     onDelete: (payload) => {
       const oldRow = payload.old as {
-        group_id: string;
-        member_name: string;
-        id: string;
+        group_id?: string;
+        member_name?: string;
+        id?: string;
       } | null;
 
-      if (!oldRow) {
+      if (!oldRow || !oldRow.id) {
         return;
       }
 
+      const removedId = oldRow.id;
+      const removedName = oldRow.member_name;
+
       setGroups((prev) =>
         prev.map((group) => {
-          if (group.id !== oldRow.group_id) return group;
+          // If this group doesn't contain the removed member, leave it unchanged
+          if (!group.members.some((m) => m.id === removedId)) return group;
 
-          const updatedMembers = group.members.filter((member) => member.id !== oldRow.id);
-          const representative = group.representative && group.representative === oldRow.member_name ? undefined : group.representative;
-
-          if (updatedMembers.length === group.members.length) return group;
+          const updatedMembers = group.members.filter((member) => member.id !== removedId);
+          const representative = removedName && group.representative === removedName ? undefined : group.representative;
 
           return {
             ...group,

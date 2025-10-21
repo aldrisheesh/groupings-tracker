@@ -609,6 +609,48 @@ function App() {
     }
   };
 
+  // Polling fallback to keep groups in sync (runs when page focused)
+  useEffect(() => {
+    let mounted = true;
+    const syncGroups = async () => {
+      try {
+        const latest = await db.fetchGroups();
+        if (!mounted) return;
+        setGroups((prev) => {
+          // quick equality check: same number of groups and same member id sets
+          if (prev.length !== latest.length) return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
+
+          const allSame = latest.every((lg) => {
+            const pg = prev.find((p) => p.id === lg.id);
+            if (!pg) return false;
+            if (pg.name !== lg.name || pg.memberLimit !== lg.memberLimit) return false;
+            const li = lg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
+            const pi = pg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
+            return li === pi && (String(lg.representative ?? '') === String(pg.representative ?? ''));
+          });
+
+          if (allSame) return prev;
+
+          return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
+        });
+      } catch (err) {
+        console.debug('Polling fetchGroups failed', err);
+      }
+    };
+
+    const id = setInterval(() => {
+      if (document.hasFocus()) syncGroups();
+    }, 3000);
+
+    // initial sync
+    syncGroups();
+
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
+
   // Subject handlers
   const handleCreateSubject = async (
     name: string,

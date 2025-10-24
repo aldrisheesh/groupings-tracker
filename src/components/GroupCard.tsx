@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Users, Edit2, Trash2, X, Crown, UsersRound } from "lucide-react";
-import { Group, GroupMember, Student } from "../App";
+import { Group, Student } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
@@ -24,17 +24,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 interface GroupCardProps {
   group: Group;
   students: Student[];
+  allGroups: Group[]; // All groups in the grouping for cross-group validation
   onJoinGroup: (groupId: string, memberName: string) => void;
   onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
-  onUpdateGroup: (
-    groupId: string,
-    updatedGroup: {
-      name?: string;
-      memberLimit?: number;
-      representative?: string | null;
-    },
-  ) => void;
-  onRemoveMember: (groupId: string, memberId: string) => void;
+  onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
+  onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   isAdmin: boolean;
   isLocked: boolean;
@@ -54,7 +48,10 @@ const normalizeForMatching = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, ''); // Remove diacritical marks
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+    .replace(/\s*-\s*/g, '-') // Normalize spacing around hyphens
+    .replace(/\s+/g, ' ') // Normalize multiple spaces
+    .trim();
 };
 
 // Helper function for fuzzy matching enrolled students
@@ -79,9 +76,49 @@ const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
   });
 };
 
+// Fuzzy matching: check if two names are similar enough to be considered the same person
+// "Santos, Roi" should match "Santos, Roi Aldrich"
+const fuzzyMatchNames = (name1: string, name2: string): boolean => {
+  const normalized1 = normalizeForMatching(name1);
+  const normalized2 = normalizeForMatching(name2);
+  
+  // Split by comma to get last name and first name
+  const parts1 = normalized1.split(',').map(p => p.trim());
+  const parts2 = normalized2.split(',').map(p => p.trim());
+  
+  // Both must have last name and first name
+  if (parts1.length !== 2 || parts2.length !== 2) {
+    return normalized1 === normalized2;
+  }
+  
+  const [last1, first1] = parts1;
+  const [last2, first2] = parts2;
+  
+  // Last names must match exactly
+  if (last1 !== last2) {
+    return false;
+  }
+  
+  // First names: check if one contains the other (bidirectional)
+  return first1.includes(first2) || first2.includes(first1);
+};
+
+// Check if name is already in ANY group (using fuzzy matching)
+const isNameInAnyGroup = (name: string, groups: Group[]): { inGroup: boolean; groupName?: string; existingName?: string } => {
+  for (const group of groups) {
+    for (const member of group.members) {
+      if (fuzzyMatchNames(name, member)) {
+        return { inGroup: true, groupName: group.name, existingName: member };
+      }
+    }
+  }
+  return { inGroup: false };
+};
+
 export function GroupCard({ 
   group, 
   students,
+  allGroups,
   onJoinGroup,
   onBatchJoinGroup,
   onUpdateGroup, 
@@ -118,13 +155,19 @@ export function GroupCard({
       return;
     }
 
-    if (group.members.some(m => normalizeForMatching(m.name) === normalizeForMatching(memberName.trim()))) {
+    if (group.members.some(m => normalizeForMatching(m) === normalizeForMatching(memberName.trim()))) {
       toast.error("You are already a member of this group");
       return;
     }
 
     if (isFull) {
       toast.error("This group is full");
+      return;
+    }
+
+    const nameCheck = isNameInAnyGroup(memberName, allGroups);
+    if (nameCheck.inGroup) {
+      toast.error(`Name already in group "${nameCheck.groupName}": ${nameCheck.existingName}`);
       return;
     }
 
@@ -167,8 +210,8 @@ export function GroupCard({
     }
 
     // Check if any names are already members
-    const alreadyMembers = names.filter(name =>
-      group.members.some(m => normalizeForMatching(m.name) === normalizeForMatching(name))
+    const alreadyMembers = names.filter(name => 
+      group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
     );
     if (alreadyMembers.length > 0) {
       toast.error(`Already a member: ${alreadyMembers[0]}`);
@@ -181,6 +224,15 @@ export function GroupCard({
       return;
     }
 
+    // Check if any names are already in any group
+    for (const name of names) {
+      const nameCheck = isNameInAnyGroup(name, allGroups);
+      if (nameCheck.inGroup) {
+        toast.error(`Name already in group "${nameCheck.groupName}": ${nameCheck.existingName}`);
+        return;
+      }
+    }
+
     // Add all members at once
     onBatchJoinGroup(group.id, names);
 
@@ -189,19 +241,19 @@ export function GroupCard({
     toast.success(`Successfully added ${names.length} member(s)`);
   };
 
-  const handleRemoveMember = (member: GroupMember) => {
-    onRemoveMember(group.id, member.id);
+  const handleRemoveMember = (memberName: string) => {
+    onRemoveMember(group.id, memberName);
   };
 
-  const handleToggleRepresentative = (member: GroupMember) => {
-    if (group.representative === member.name) {
+  const handleToggleRepresentative = (memberName: string) => {
+    if (group.representative === memberName) {
       // Remove representative
       onUpdateGroup(group.id, { representative: null });
       toast.success("Representative removed");
     } else {
       // Set new representative
-      onUpdateGroup(group.id, { representative: member.name });
-      toast.success(`${member.name} is now the group representative`);
+      onUpdateGroup(group.id, { representative: memberName });
+      toast.success(`${memberName} is now the group representative`);
     }
   };
 
@@ -258,7 +310,7 @@ export function GroupCard({
                 <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 {group.name}
               </CardTitle>
-              <Badge variant={isFull ? "secondary" : "default"} className={`text-xs px-2 py-0.5 ${isFull ? "bg-red-500 hover:bg-red-500 dark:bg-red-600 dark:hover:bg-red-600" : "bg-emerald-500 hover:bg-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-600"}`}>
+              <Badge variant={isFull ? "secondary" : "default"} className={`text-xs ${isFull ? "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-950 border-red-200 dark:border-red-900" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-950 border-emerald-200 dark:border-emerald-900"}`}>
                 {isFull ? "Full" : "Available"}
               </Badge>
             </div>
@@ -294,74 +346,64 @@ export function GroupCard({
               Members ({group.members.length}/{group.memberLimit}):
             </p>
             <ul className="space-y-1">
-              {(() => {
-                const sorted = [...group.members].sort((a, b) => a.name.localeCompare(b.name));
-                const seen = new Set();
-                return sorted
-                  .filter((member) => {
-                    const signature = `${member.id ?? ''}::${member.name}`;
-                    if (seen.has(signature)) return false;
-                    seen.add(signature);
-                    return true;
-                  })
-                  .map((member, index) => {
-                    const isRepresentative = group.representative === member.name;
-                    const key = `${member.id ?? member.name}-${index}`;
-                    return (
-                      <li key={key} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
-                          <span className="flex-1 min-w-0 truncate">{member.name}</span>
-                          {isRepresentative && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex">
-                                    <Badge className="bg-amber-500 hover:bg-amber-500 dark:bg-amber-600 dark:hover:bg-amber-600 flex-shrink-0">
-                                      <Crown className="w-3 h-3" />
-                                    </Badge>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Group Representative</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
-                                  onClick={() => handleToggleRepresentative(member)}
-                                >
+              {[...group.members]
+                .sort((a, b) => a.localeCompare(b))
+                .map((member, index) => {
+                const isRepresentative = group.representative === member;
+                return (
+                  <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
+                      <span className="flex-1 min-w-0 truncate">{member}</span>
+                      {isRepresentative && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-950 border-amber-200 dark:border-amber-900 flex-shrink-0">
                                   <Crown className="w-3 h-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          {!isLocked && (
+                                </Badge>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Group Representative</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 dark:hover:bg-slate-800"
-                              onClick={() => handleRemoveMember(member)}
+                              className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
+                              onClick={() => handleToggleRepresentative(member)}
                             >
-                              <X className="w-3 h-3 text-red-600 dark:text-red-400" />
+                              <Crown className="w-3 h-3" />
                             </Button>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  });
-              })()}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {(!isLocked || isAdmin) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 dark:hover:bg-slate-800"
+                          onClick={() => handleRemoveMember(member)}
+                        >
+                          <X className="w-3 h-3 text-red-600 dark:text-red-400" />
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </CardContent>

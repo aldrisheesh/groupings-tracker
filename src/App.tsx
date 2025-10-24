@@ -6,7 +6,8 @@ import { GroupingPage } from "./components/GroupingPage";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import * as db from "./utils/supabase/database";
-import { useRealtime } from "./hooks/useRealtime";
+import { supabase } from "./utils/supabase/client";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 export type Subject = {
   id: string;
@@ -20,19 +21,15 @@ export type Grouping = {
   id: string;
   subjectId: string;
   title: string;
+  color: string;
   locked?: boolean;
-};
-
-export type GroupMember = {
-  id: string;
-  name: string;
 };
 
 export type Group = {
   id: string;
   groupingId: string;
   name: string;
-  members: GroupMember[];
+  members: string[];
   memberLimit: number;
   representative?: string;
 };
@@ -40,6 +37,18 @@ export type Group = {
 export type Student = {
   id: string;
   name: string;
+};
+
+export type GroupHistory = {
+  id: string;
+  groupingId: string;
+  groupId: string | null;
+  actionType: 'group_created' | 'group_deleted' | 'member_added' | 'member_removed' | 'group_updated' | 'representative_set' | 'representative_removed';
+  groupName: string;
+  memberName?: string;
+  details?: string;
+  performedBy: 'admin' | 'user';
+  createdAt: string;
 };
 
 export type Page =
@@ -68,512 +77,197 @@ function App() {
   const [groupings, setGroupings] = useState<Grouping[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
-  // Helper: deduplicate members by id (fallback to name) and preserve order
-  const dedupeMembers = (members: GroupMember[]) => {
-    const map = new Map<string, GroupMember>();
-    for (const m of members) {
-      const key = String(m.id ?? m.name);
-      // Keep the first occurrence to preserve existing order
-      if (!map.has(key)) map.set(key, m);
-    }
-    return Array.from(map.values());
-  };
-
-  // Helper: normalize names for robust matching (accent-insensitive)
-  const normalizeForMatching = (text?: string) =>
-    (text ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
   // Load all data on mount
   useEffect(() => {
     loadAllData();
   }, []);
 
-  useRealtime({
-    table: "subjects",
-    onInsert: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        name: string;
-        color: string;
-        icon: string;
-      } | null;
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (loading || dbError) return;
 
-      if (!newRow) {
-        return;
-      }
+    console.log('Setting up real-time subscriptions...');
 
-      const newSubject: Subject = {
-        id: newRow.id,
-        name: newRow.name,
-        color: newRow.color,
-        icon: newRow.icon,
-        students: [],
-      };
-
-      setSubjects((prev) => {
-        const existingIndex = prev.findIndex((subject) => subject.id === newSubject.id);
-        if (existingIndex !== -1) {
-          return prev.map((subject) =>
-            subject.id === newSubject.id
-              ? {
-                  ...subject,
-                  name: newSubject.name,
-                  color: newSubject.color,
-                  icon: newSubject.icon,
-                }
-              : subject,
-          );
+    // Subscribe to subjects table
+    const subjectsChannel = supabase
+      .channel('subjects-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subjects' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Subjects change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newSubject = await db.fetchSubjects();
+            const inserted = newSubject.find((s: Subject) => s.id === payload.new.id);
+            if (inserted) {
+              setSubjects((prev) => {
+                if (prev.some(s => s.id === inserted.id)) return prev;
+                return [...prev, inserted];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedSubjects = await db.fetchSubjects();
+            const updated = updatedSubjects.find((s: Subject) => s.id === payload.new.id);
+            if (updated) {
+              setSubjects((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            setSubjects((prev) => prev.filter((s) => s.id !== payload.old.id));
+            setGroupings((prev) => prev.filter((g) => g.subjectId !== payload.old.id));
+          }
         }
+      )
+      .subscribe();
 
-        return [newSubject, ...prev];
-      });
-    },
-    onUpdate: (payload) => {
-      const updatedRow = payload.new as {
-        id: string;
-        name: string;
-        color: string;
-        icon: string;
-      } | null;
-
-      if (!updatedRow) {
-        return;
-      }
-
-      setSubjects((prev) =>
-        prev.map((subject) =>
-          subject.id === updatedRow.id
-            ? {
-                ...subject,
-                name: updatedRow.name,
-                color: updatedRow.color,
-                icon: updatedRow.icon,
-              }
-            : subject,
-        ),
-      );
-    },
-    onDelete: (payload) => {
-      const removedRow = payload.old as { id: string } | null;
-      if (!removedRow) {
-        return;
-      }
-
-      const groupingIdsToRemove = groupings
-        .filter((grouping) => grouping.subjectId === removedRow.id)
-        .map((grouping) => grouping.id);
-
-      setSubjects((prev) => prev.filter((subject) => subject.id !== removedRow.id));
-      setGroupings((prev) => prev.filter((grouping) => grouping.subjectId !== removedRow.id));
-      setGroups((prev) =>
-        prev.filter((group) => !groupingIdsToRemove.includes(group.groupingId)),
-      );
-      setCurrentPage((prev) => {
-        if (prev.type === "subject" && prev.subjectId === removedRow.id) {
-          return { type: "home" };
+    // Subscribe to students table
+    const studentsChannel = supabase
+      .channel('students-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students' },
+        async () => {
+          console.log('Students change received, reloading subjects...');
+          // Reload all subjects to get updated students
+          const updatedSubjects = await db.fetchSubjects();
+          setSubjects(updatedSubjects);
         }
-        if (prev.type === "grouping" && prev.subjectId === removedRow.id) {
-          return { type: "home" };
-        }
-        return prev;
-      });
-    },
-  });
+      )
+      .subscribe();
 
-  useRealtime({
-    table: "students",
-    onInsert: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        subject_id: string;
-        name: string;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      const newStudent: Student = {
-        id: newRow.id,
-        name: newRow.name,
-      };
-
-      setSubjects((prev) =>
-        prev.map((subject) => {
-          if (subject.id !== newRow.subject_id) {
-            return subject;
-          }
-
-          const alreadyExists = subject.students.some(
-            (student) => student.id === newStudent.id,
-          );
-
-          if (alreadyExists) {
-            return subject;
-          }
-
-          return {
-            ...subject,
-            students: [...subject.students, newStudent],
-          };
-        }),
-      );
-    },
-    onUpdate: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        subject_id: string;
-        name: string;
-      } | null;
-      const oldRow = payload.old as {
-        id: string;
-        subject_id: string;
-        name?: string;
-      } | null;
-
-      if (!newRow || !oldRow) {
-        return;
-      }
-
-      const updatedStudent: Student = {
-        id: newRow.id,
-        name: newRow.name,
-      };
-
-      setSubjects((prev) =>
-        prev.map((subject) => {
-          let students = subject.students;
-
-          if (subject.id === oldRow.subject_id && oldRow.subject_id !== newRow.subject_id) {
-            students = students.filter((student) => student.id !== oldRow.id);
-          }
-
-          if (subject.id === newRow.subject_id) {
-            const withoutUpdated = students.filter((student) => student.id !== newRow.id);
-            students = [...withoutUpdated, updatedStudent];
-          }
-
-          if (students !== subject.students) {
-            return {
-              ...subject,
-              students,
+    // Subscribe to groupings table
+    const groupingsChannel = supabase
+      .channel('groupings-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'groupings' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Groupings change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newGrouping: Grouping = {
+              id: payload.new.id,
+              subjectId: payload.new.subject_id,
+              title: payload.new.title,
+              color: payload.new.color,
+              locked: payload.new.locked,
             };
+            setGroupings((prev) => {
+              if (prev.some(g => g.id === newGrouping.id)) return prev;
+              return [...prev, newGrouping];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setGroupings((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.id
+                  ? {
+                      ...g,
+                      title: payload.new.title,
+                      color: payload.new.color,
+                      locked: payload.new.locked,
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroupings((prev) => prev.filter((g) => g.id !== payload.old.id));
+            setGroups((prev) => prev.filter((gr) => gr.groupingId !== payload.old.id));
           }
-
-          return subject;
-        }),
-      );
-    },
-    onDelete: (payload) => {
-      const oldRow = payload.old as {
-        id: string;
-        subject_id: string;
-      } | null;
-
-      if (!oldRow) {
-        return;
-      }
-
-      setSubjects((prev) =>
-        prev.map((subject) =>
-          subject.id === oldRow.subject_id
-            ? {
-                ...subject,
-                students: subject.students.filter((student) => student.id !== oldRow.id),
-              }
-            : subject,
-        ),
-      );
-    },
-  });
-
-  useRealtime({
-    table: "groupings",
-    onInsert: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        subject_id: string;
-        title: string;
-        locked: boolean | null;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      const newGrouping: Grouping = {
-        id: newRow.id,
-        subjectId: newRow.subject_id,
-        title: newRow.title,
-        locked: newRow.locked ?? undefined,
-      };
-
-      setGroupings((prev) => {
-        const exists = prev.some((grouping) => grouping.id === newGrouping.id);
-        if (exists) {
-          return prev.map((grouping) =>
-            grouping.id === newGrouping.id ? { ...grouping, ...newGrouping } : grouping,
-          );
         }
+      )
+      .subscribe();
 
-        return [newGrouping, ...prev];
-      });
-    },
-    onUpdate: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        subject_id: string;
-        title: string;
-        locked: boolean | null;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      setGroupings((prev) =>
-        prev.map((grouping) =>
-          grouping.id === newRow.id
-            ? {
-                ...grouping,
-                subjectId: newRow.subject_id,
-                title: newRow.title,
-                locked: newRow.locked ?? undefined,
-              }
-            : grouping,
-        ),
-      );
-    },
-    onDelete: (payload) => {
-      const oldRow = payload.old as {
-        id: string;
-        subject_id: string;
-      } | null;
-
-      if (!oldRow) {
-        return;
-      }
-
-      setGroupings((prev) => prev.filter((grouping) => grouping.id !== oldRow.id));
-      setGroups((prev) => prev.filter((group) => group.groupingId !== oldRow.id));
-      setCurrentPage((prev) => {
-        if (prev.type === "grouping" && prev.groupingId === oldRow.id) {
-          return { type: "subject", subjectId: oldRow.subject_id };
+    // Subscribe to groups table
+    const groupsChannel = supabase
+      .channel('groups-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'groups' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Groups change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newGroup: Group = {
+              id: payload.new.id,
+              groupingId: payload.new.grouping_id,
+              name: payload.new.name,
+              members: [],
+              memberLimit: payload.new.member_limit,
+              representative: payload.new.representative || undefined,
+            };
+            setGroups((prev) => {
+              if (prev.some(g => g.id === newGroup.id)) return prev;
+              return [...prev, newGroup];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.id
+                  ? {
+                      ...g,
+                      name: payload.new.name,
+                      memberLimit: payload.new.member_limit,
+                      representative: payload.new.representative || undefined,
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroups(groups.filter((g) => g.id !== payload.old.id));
+          }
         }
+      )
+      .subscribe();
 
-        return prev;
-      });
-    },
-  });
-
-  useRealtime({
-    table: "groups",
-    onInsert: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        grouping_id: string;
-        name: string;
-        member_limit: number;
-        representative: string | null;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      const newGroup: Group = {
-        id: newRow.id,
-        groupingId: newRow.grouping_id,
-        name: newRow.name,
-        members: [],
-        memberLimit: newRow.member_limit,
-        representative: newRow.representative ?? undefined,
-      };
-
-      setGroups((prev) => {
-        const existing = prev.find((group) => group.id === newGroup.id);
-        if (existing) {
-          return prev.map((group) =>
-            group.id === newGroup.id
-              ? {
-                  ...existing,
-                  groupingId: newGroup.groupingId,
-                  name: newGroup.name,
-                  memberLimit: newGroup.memberLimit,
-                  representative: newGroup.representative,
-                }
-              : group,
-          );
+    // Subscribe to group_members table
+    const groupMembersChannel = supabase
+      .channel('group-members-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_members' },
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('Group members change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.new.group_id
+                  ? {
+                      ...g,
+                      // Only add if not already present (prevent duplicates)
+                      members: g.members.includes(payload.new.member_name)
+                        ? g.members
+                        : [...g.members, payload.new.member_name],
+                    }
+                  : g
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setGroups((prev) =>
+              prev.map((g) =>
+                g.id === payload.old.group_id
+                  ? {
+                      ...g,
+                      members: g.members.filter((m) => m !== payload.old.member_name),
+                    }
+                  : g
+              )
+            );
+          }
         }
+      )
+      .subscribe();
 
-        return [...prev, newGroup];
-      });
-    },
-    onUpdate: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        grouping_id: string;
-        name: string;
-        member_limit: number;
-        representative: string | null;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      setGroups((prev) =>
-        prev.map((group) =>
-          group.id === newRow.id
-            ? {
-                ...group,
-                groupingId: newRow.grouping_id,
-                name: newRow.name,
-                memberLimit: newRow.member_limit,
-                representative: newRow.representative ?? undefined,
-              }
-            : group,
-        ),
-      );
-    },
-    onDelete: (payload) => {
-      const oldRow = payload.old as { id: string } | null;
-      if (!oldRow) {
-        return;
-      }
-
-      setGroups((prev) => prev.filter((group) => group.id !== oldRow.id));
-    },
-  });
-
-  useRealtime({
-    table: "group_members",
-    onInsert: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        group_id: string;
-        member_name: string;
-      } | null;
-
-      if (!newRow) {
-        return;
-      }
-
-      const newMember: GroupMember = {
-        id: newRow.id,
-        name: newRow.member_name,
-      };
-
-      setGroups((prev) =>
-        prev.map((group) => {
-          if (group.id !== newRow.group_id) return group;
-
-          // Merge and dedupe to avoid duplicates across clients
-          const merged = [...group.members, newMember];
-          const deduped = dedupeMembers(merged);
-          deduped.sort((a, b) => a.name.localeCompare(b.name));
-
-          // If nothing changed, return original
-          if (deduped.length === group.members.length && deduped.every((m, i) => m.id === group.members[i]?.id)) {
-            return group;
-          }
-
-          return {
-            ...group,
-            members: deduped,
-          };
-        }),
-      );
-    },
-    onUpdate: (payload) => {
-      const newRow = payload.new as {
-        id: string;
-        group_id: string;
-        member_name: string;
-      } | null;
-      const oldRow = payload.old as {
-        id: string;
-        group_id: string;
-        member_name: string;
-      } | null;
-
-      if (!newRow || !oldRow) {
-        return;
-      }
-
-      const updatedMember: GroupMember = {
-        id: newRow.id,
-        name: newRow.member_name,
-      };
-
-      setGroups((prev) =>
-        prev.map((group) => {
-          let members = group.members;
-
-          if (group.id === oldRow.group_id) {
-            members = members.filter((member) => member.id !== oldRow.id);
-          }
-
-          if (group.id === newRow.group_id) {
-            members = [...members.filter((member) => member.id !== newRow.id), updatedMember];
-          }
-
-          const deduped = dedupeMembers(members);
-          deduped.sort((a, b) => a.name.localeCompare(b.name));
-
-          if (deduped.length === group.members.length && deduped.every((m, i) => m.id === group.members[i]?.id)) {
-            return group;
-          }
-
-          return {
-            ...group,
-            members: deduped,
-          };
-        }),
-      );
-    },
-    onDelete: (payload) => {
-      const oldRow = payload.old as {
-        group_id?: string;
-        member_name?: string;
-        id?: string;
-      } | null;
-
-      if (!oldRow || !oldRow.id) {
-        return;
-      }
-
-      console.debug("Realtime delete payload (group_members):", oldRow);
-
-      const removedId = oldRow.id;
-      const removedName = oldRow.member_name;
-      const removedNameNorm = normalizeForMatching(removedName);
-
-      setGroups((prev) =>
-        prev.map((group) => {
-          // If this group doesn't contain the removed member by id or name, leave it unchanged
-          if (
-            !group.members.some((m) => m.id === removedId) &&
-            !group.members.some((m) => normalizeForMatching(m.name) === removedNameNorm)
-          ) {
-            return group;
-          }
-
-          const updatedMembers = group.members.filter(
-            (member) => member.id !== removedId && normalizeForMatching(member.name) !== removedNameNorm,
-          );
-
-          const representative = removedName && normalizeForMatching(group.representative ?? "") === removedNameNorm ? undefined : group.representative;
-
-          return {
-            ...group,
-            members: updatedMembers,
-            representative,
-          };
-        }),
-      );
-    },
-  });
+    // Cleanup subscriptions on unmount
+    return () => {
+      console.log('Cleaning up real-time subscriptions...');
+      subjectsChannel.unsubscribe();
+      studentsChannel.unsubscribe();
+      groupingsChannel.unsubscribe();
+      groupsChannel.unsubscribe();
+      groupMembersChannel.unsubscribe();
+    };
+  }, [loading, dbError]);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -608,48 +302,6 @@ function App() {
       setLoading(false);
     }
   };
-
-  // Polling fallback to keep groups in sync (runs when page focused)
-  useEffect(() => {
-    let mounted = true;
-    const syncGroups = async () => {
-      try {
-        const latest = await db.fetchGroups();
-        if (!mounted) return;
-        setGroups((prev) => {
-          // quick equality check: same number of groups and same member id sets
-          if (prev.length !== latest.length) return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
-
-          const allSame = latest.every((lg) => {
-            const pg = prev.find((p) => p.id === lg.id);
-            if (!pg) return false;
-            if (pg.name !== lg.name || pg.memberLimit !== lg.memberLimit) return false;
-            const li = lg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
-            const pi = pg.members.map((m) => String(m.id ?? m.name)).sort().join(',');
-            return li === pi && (String(lg.representative ?? '') === String(pg.representative ?? ''));
-          });
-
-          if (allSame) return prev;
-
-          return latest.map(g => ({ ...g, members: dedupeMembers(g.members) }));
-        });
-      } catch (err) {
-        console.debug('Polling fetchGroups failed', err);
-      }
-    };
-
-    const id = setInterval(() => {
-      if (document.hasFocus()) syncGroups();
-    }, 3000);
-
-    // initial sync
-    syncGroups();
-
-    return () => {
-      mounted = false;
-      clearInterval(id);
-    };
-  }, []);
 
   // Subject handlers
   const handleCreateSubject = async (
@@ -767,10 +419,12 @@ function App() {
   const handleCreateGrouping = async (
     subjectId: string,
     title: string,
+    color: string,
   ) => {
     const newGrouping = await db.createGrouping(
       subjectId,
       title,
+      color,
     );
     if (newGrouping) {
       setGroupings([...groupings, newGrouping]);
@@ -815,6 +469,23 @@ function App() {
     }
   };
 
+  const handleUpdateGrouping = async (
+    groupingId: string,
+    updates: { title?: string; color?: string }
+  ) => {
+    const success = await db.updateGrouping(groupingId, updates);
+    if (success) {
+      setGroupings(
+        groupings.map((g) =>
+          g.id === groupingId ? { ...g, ...updates } : g
+        ),
+      );
+      toast.success("Grouping updated successfully!");
+    } else {
+      toast.error("Failed to update grouping");
+    }
+  };
+
   // Group handlers
   const handleCreateGroup = async (
     groupingId: string,
@@ -828,6 +499,7 @@ function App() {
     );
     if (newGroup) {
       setGroups([...groups, newGroup]);
+      // Don't log group creation to keep history focused on member changes
       toast.success(`${groupName} created successfully!`);
     } else {
       toast.error("Failed to create group");
@@ -838,19 +510,30 @@ function App() {
     groupId: string,
     memberName: string,
   ) => {
-    const newMember = await db.addMemberToGroup(
+    const success = await db.addMemberToGroup(
       groupId,
       memberName,
     );
-    if (newMember) {
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id !== groupId) return g;
-          const merged = [...g.members, newMember];
-          const deduped = dedupeMembers(merged);
-          deduped.sort((a, b) => a.name.localeCompare(b.name));
-          return { ...g, members: deduped };
-        }),
+    if (success) {
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        // Log history
+        await db.logGroupHistory(
+          group.groupingId,
+          groupId,
+          'member_added',
+          group.name,
+          memberName,
+          null,
+          isAdmin ? 'admin' : 'user'
+        );
+      }
+      setGroups(
+        groups.map((g) =>
+          g.id === groupId
+            ? { ...g, members: [...g.members, memberName] }
+            : g,
+        ),
       );
     } else {
       toast.error("Failed to join group");
@@ -861,19 +544,32 @@ function App() {
     groupId: string,
     memberNames: string[],
   ) => {
-    const newMembers = await db.batchAddMembersToGroup(
+    const success = await db.batchAddMembersToGroup(
       groupId,
       memberNames,
     );
-    if (newMembers) {
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id !== groupId) return g;
-          const merged = [...g.members, ...newMembers];
-          const deduped = dedupeMembers(merged);
-          deduped.sort((a, b) => a.name.localeCompare(b.name));
-          return { ...g, members: deduped };
-        }),
+    if (success) {
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        // Log history for each member
+        for (const memberName of memberNames) {
+          await db.logGroupHistory(
+            group.groupingId,
+            groupId,
+            'member_added',
+            group.name,
+            memberName,
+            null,
+            isAdmin ? 'admin' : 'user'
+          );
+        }
+      }
+      setGroups(
+        groups.map((g) =>
+          g.id === groupId
+            ? { ...g, members: [...g.members, ...memberNames] }
+            : g,
+        ),
       );
     } else {
       toast.error("Failed to add members");
@@ -882,38 +578,32 @@ function App() {
 
   const handleUpdateGroup = async (
     groupId: string,
-    updatedGroup: {
-      name?: string;
-      memberLimit?: number;
-      representative?: string | null;
-    },
+    updatedGroup: Partial<Group>,
   ) => {
     const success = await db.updateGroup(groupId, updatedGroup);
     if (success) {
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id !== groupId) {
-            return g;
-          }
-
-          return {
-            ...g,
-            ...(updatedGroup.name !== undefined
-              ? { name: updatedGroup.name }
-              : {}),
-            ...(updatedGroup.memberLimit !== undefined
-              ? { memberLimit: updatedGroup.memberLimit }
-              : {}),
-            ...(updatedGroup.representative !== undefined
-              ? {
-                  representative:
-                    updatedGroup.representative === null
-                      ? undefined
-                      : updatedGroup.representative,
-                }
-              : {}),
-          };
-        }),
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        // Check if representative was SET (not removed)
+        if (updatedGroup.representative !== undefined && updatedGroup.representative !== null) {
+          // Representative set
+          await db.logGroupHistory(
+            group.groupingId,
+            groupId,
+            'representative_set',
+            group.name,
+            updatedGroup.representative,
+            null,
+            isAdmin ? 'admin' : 'user'
+          );
+        }
+        // Don't log representative removal or other updates
+      }
+      
+      setGroups(
+        groups.map((g) =>
+          g.id === groupId ? { ...g, ...updatedGroup } : g,
+        ),
       );
     } else {
       toast.error("Failed to update group");
@@ -922,30 +612,37 @@ function App() {
 
   const handleRemoveMember = async (
     groupId: string,
-    memberId: string,
+    memberName: string,
   ) => {
     const success = await db.removeMemberFromGroup(
-      memberId,
+      groupId,
+      memberName,
     );
     if (success) {
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id !== groupId) {
-            return g;
-          }
-
-          const removedMember = g.members.find((member) => member.id === memberId);
-          const updatedMembers = g.members.filter((member) => member.id !== memberId);
-
-          return {
-            ...g,
-            members: updatedMembers,
-            representative:
-              removedMember && g.representative === removedMember.name
-                ? undefined
-                : g.representative,
-          };
-        }),
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        // Log history
+        await db.logGroupHistory(
+          group.groupingId,
+          groupId,
+          'member_removed',
+          group.name,
+          memberName,
+          null,
+          isAdmin ? 'admin' : 'user'
+        );
+      }
+      setGroups(
+        groups.map((g) =>
+          g.id === groupId
+            ? {
+                ...g,
+                members: g.members.filter(
+                  (m) => m !== memberName,
+                ),
+              }
+            : g,
+        ),
       );
     } else {
       toast.error("Failed to remove member");
@@ -955,6 +652,7 @@ function App() {
   const handleDeleteGroup = async (groupId: string) => {
     const success = await db.deleteGroup(groupId);
     if (success) {
+      // Don't log group deletion to keep history focused on member changes
       setGroups(groups.filter((g) => g.id !== groupId));
     } else {
       toast.error("Failed to delete group");
@@ -1120,7 +818,7 @@ function App() {
 
           <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
             <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-              ���� For detailed instructions, see{" "}
+              📚 For detailed instructions, see{" "}
               <code className="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-xs">
                 GETTING_STARTED.md
               </code>
@@ -1174,6 +872,8 @@ function App() {
                 groupings={subjectGroupings}
                 onNavigate={(page) => setCurrentPage(page)}
                 onCreateGrouping={handleCreateGrouping}
+                onUpdateGrouping={handleUpdateGrouping}
+                onDeleteGrouping={handleDeleteGrouping}
                 onBack={() => setCurrentPage({ type: "home" })}
                 isAdmin={isAdmin}
               />

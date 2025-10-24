@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { Subject, Student, Grouping, Group, GroupMember } from '../../App';
+import { Subject, Student, Grouping, Group } from '../../App';
 
 // ============ SUBJECTS ============
 
@@ -191,15 +191,17 @@ export async function fetchGroupings(): Promise<Grouping[]> {
     id: g.id,
     subjectId: g.subject_id,
     title: g.title,
+    color: g.color || 'bg-indigo-500',
     locked: g.locked,
   }));
 }
 
-export async function createGrouping(subjectId: string, title: string): Promise<Grouping | null> {
+export async function createGrouping(subjectId: string, title: string, color: string): Promise<Grouping | null> {
   const newGrouping = {
     id: crypto.randomUUID(),
     subject_id: subjectId,
     title,
+    color,
     locked: false,
   };
 
@@ -218,8 +220,23 @@ export async function createGrouping(subjectId: string, title: string): Promise<
     id: data.id,
     subjectId: data.subject_id,
     title: data.title,
+    color: data.color,
     locked: data.locked,
   };
+}
+
+export async function updateGrouping(id: string, updates: { title?: string; color?: string }): Promise<boolean> {
+  const { error } = await supabase
+    .from('groupings')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error updating grouping:', error);
+    return false;
+  }
+
+  return true;
 }
 
 export async function deleteGrouping(id: string): Promise<boolean> {
@@ -294,7 +311,7 @@ export async function fetchGroups(): Promise<Group[]> {
     name: group.name,
     members: members
       .filter(member => member.group_id === group.id)
-      .map((member): GroupMember => ({ id: member.id, name: member.member_name })),
+      .map(member => member.member_name),
     memberLimit: group.member_limit,
     representative: group.representative || undefined,
   }));
@@ -330,32 +347,60 @@ export async function createGroup(groupingId: string, name: string, memberLimit:
   };
 }
 
-export async function updateGroup(
-  id: string,
-  updates: {
-    name?: string;
-    memberLimit?: number;
-    representative?: string | null;
-  },
-): Promise<boolean> {
+export async function updateGroup(id: string, updates: Partial<Group>): Promise<boolean> {
   const dbUpdates: any = {};
 
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.memberLimit !== undefined) dbUpdates.member_limit = updates.memberLimit;
   if (updates.representative !== undefined) dbUpdates.representative = updates.representative;
 
-  if (Object.keys(dbUpdates).length === 0) {
-    return true;
+  // Handle member updates separately
+  if (updates.members !== undefined) {
+    // Get current members
+    const { data: currentMembers } = await supabase
+      .from('group_members')
+      .select('member_name')
+      .eq('group_id', id);
+
+    const currentMemberNames = currentMembers?.map(m => m.member_name) || [];
+    const newMemberNames = updates.members;
+
+    // Find members to add and remove
+    const toAdd = newMemberNames.filter(name => !currentMemberNames.includes(name));
+    const toRemove = currentMemberNames.filter(name => !newMemberNames.includes(name));
+
+    // Add new members
+    if (toAdd.length > 0) {
+      const newMembers = toAdd.map(name => ({
+        id: crypto.randomUUID(),
+        group_id: id,
+        member_name: name,
+      }));
+
+      await supabase.from('group_members').insert(newMembers);
+    }
+
+    // Remove old members
+    if (toRemove.length > 0) {
+      await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', id)
+        .in('member_name', toRemove);
+    }
   }
 
-  const { error } = await supabase
-    .from('groups')
-    .update(dbUpdates)
-    .eq('id', id);
+  // Update group fields if any
+  if (Object.keys(dbUpdates).length > 0) {
+    const { error } = await supabase
+      .from('groups')
+      .update(dbUpdates)
+      .eq('id', id);
 
-  if (error) {
-    console.error('Error updating group:', error);
-    return false;
+    if (error) {
+      console.error('Error updating group:', error);
+      return false;
+    }
   }
 
   return true;
@@ -376,52 +421,50 @@ export async function deleteGroup(id: string): Promise<boolean> {
   return true;
 }
 
-export async function addMemberToGroup(groupId: string, memberName: string): Promise<GroupMember | null> {
+export async function addMemberToGroup(groupId: string, memberName: string): Promise<boolean> {
   const newMember = {
     id: crypto.randomUUID(),
     group_id: groupId,
     member_name: memberName,
   };
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('group_members')
-    .insert([newMember])
-    .select()
-    .single();
+    .insert([newMember]);
 
   if (error) {
     console.error('Error adding member to group:', error);
-    return null;
+    return false;
   }
 
-  return { id: data.id, name: data.member_name };
+  return true;
 }
 
-export async function batchAddMembersToGroup(groupId: string, memberNames: string[]): Promise<GroupMember[] | null> {
+export async function batchAddMembersToGroup(groupId: string, memberNames: string[]): Promise<boolean> {
   const newMembers = memberNames.map(name => ({
     id: crypto.randomUUID(),
     group_id: groupId,
     member_name: name,
   }));
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('group_members')
-    .insert(newMembers)
-    .select();
+    .insert(newMembers);
 
   if (error) {
     console.error('Error batch adding members to group:', error);
-    return null;
+    return false;
   }
 
-  return (data ?? []).map((member) => ({ id: member.id, name: member.member_name }));
+  return true;
 }
 
-export async function removeMemberFromGroup(memberId: string): Promise<boolean> {
+export async function removeMemberFromGroup(groupId: string, memberName: string): Promise<boolean> {
   const { error } = await supabase
     .from('group_members')
     .delete()
-    .eq('id', memberId);
+    .eq('group_id', groupId)
+    .eq('member_name', memberName);
 
   if (error) {
     console.error('Error removing member from group:', error);
@@ -429,4 +472,60 @@ export async function removeMemberFromGroup(memberId: string): Promise<boolean> 
   }
 
   return true;
+}
+
+// ============ GROUP HISTORY ============
+
+export async function fetchGroupHistory(groupingId: string) {
+  const { data, error } = await supabase
+    .from('group_history')
+    .select('*')
+    .eq('grouping_id', groupingId)
+    .order('created_at', { ascending: false })
+    .limit(100); // Limit to most recent 100 entries to keep it lightweight
+
+  if (error) {
+    console.error('Error fetching group history:', error);
+    return [];
+  }
+
+  return data.map((entry: any) => ({
+    id: entry.id,
+    groupingId: entry.grouping_id,
+    groupId: entry.group_id,
+    actionType: entry.action_type,
+    groupName: entry.group_name,
+    memberName: entry.member_name,
+    details: entry.details,
+    performedBy: entry.performed_by,
+    createdAt: entry.created_at,
+  }));
+}
+
+export async function logGroupHistory(
+  groupingId: string,
+  groupId: string | null,
+  actionType: string,
+  groupName: string,
+  memberName: string | null,
+  details: string | null,
+  performedBy: 'admin' | 'user'
+): Promise<void> {
+  const historyEntry = {
+    grouping_id: groupingId,
+    group_id: groupId,
+    action_type: actionType,
+    group_name: groupName,
+    member_name: memberName,
+    details,
+    performed_by: performedBy,
+  };
+
+  const { error } = await supabase
+    .from('group_history')
+    .insert([historyEntry]);
+
+  if (error) {
+    console.error('Error logging group history:', error);
+  }
 }

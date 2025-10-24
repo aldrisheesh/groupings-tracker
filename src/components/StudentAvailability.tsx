@@ -62,8 +62,8 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   students.forEach(student => {
     groups.forEach(group => {
       group.members.forEach(member => {
-        if (fuzzyMatch(student.name, member.name)) {
-          studentsInGroups.set(student.name, member.name);
+        if (fuzzyMatch(student.name, member)) {
+          studentsInGroups.set(student.name, member);
         }
       });
     });
@@ -86,7 +86,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   // Find which group a student belongs to
   const findStudentGroup = (studentName: string): string | null => {
     for (const group of groups) {
-      if (group.members.some(member => fuzzyMatch(studentName, member.name))) {
+      if (group.members.some(member => fuzzyMatch(studentName, member))) {
         return group.name;
       }
     }

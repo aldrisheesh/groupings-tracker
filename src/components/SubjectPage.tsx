@@ -15,11 +15,35 @@ interface SubjectPageProps {
   onNavigate: (page: Page) => void;
   onBack: () => void;
   isAdmin: boolean;
-  onCreateGrouping: (subjectId: string, title: string) => void;
+  onCreateGrouping: (subjectId: string, title: string, color: string) => void;
+  onUpdateGrouping: (groupingId: string, updates: { title?: string; color?: string }) => void;
+  onDeleteGrouping: (groupingId: string) => void;
 }
 
-export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, onCreateGrouping }: SubjectPageProps) {
+const COLOR_OPTIONS = [
+  { value: "bg-red-500", label: "Red", class: "bg-red-500" },
+  { value: "bg-orange-500", label: "Orange", class: "bg-orange-500" },
+  { value: "bg-amber-500", label: "Amber", class: "bg-amber-500" },
+  { value: "bg-yellow-500", label: "Yellow", class: "bg-yellow-500" },
+  { value: "bg-lime-500", label: "Lime", class: "bg-lime-500" },
+  { value: "bg-green-500", label: "Green", class: "bg-green-500" },
+  { value: "bg-emerald-500", label: "Emerald", class: "bg-emerald-500" },
+  { value: "bg-teal-500", label: "Teal", class: "bg-teal-500" },
+  { value: "bg-cyan-500", label: "Cyan", class: "bg-cyan-500" },
+  { value: "bg-sky-500", label: "Sky", class: "bg-sky-500" },
+  { value: "bg-blue-500", label: "Blue", class: "bg-blue-500" },
+  { value: "bg-indigo-500", label: "Indigo", class: "bg-indigo-500" },
+  { value: "bg-violet-500", label: "Violet", class: "bg-violet-500" },
+  { value: "bg-purple-500", label: "Purple", class: "bg-purple-500" },
+  { value: "bg-fuchsia-500", label: "Fuchsia", class: "bg-fuchsia-500" },
+  { value: "bg-pink-500", label: "Pink", class: "bg-pink-500" },
+  { value: "bg-rose-500", label: "Rose", class: "bg-rose-500" },
+  { value: "bg-slate-500", label: "Slate", class: "bg-slate-500" },
+];
+
+export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, onCreateGrouping, onUpdateGrouping, onDeleteGrouping }: SubjectPageProps) {
   const [groupingTitle, setGroupingTitle] = useState("");
+  const [groupingColor, setGroupingColor] = useState("bg-indigo-500");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCreateGrouping = () => {
@@ -28,9 +52,10 @@ export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, o
       return;
     }
 
-    onCreateGrouping(subject.id, groupingTitle.trim());
+    onCreateGrouping(subject.id, groupingTitle.trim(), groupingColor);
     toast.success(`${groupingTitle} created successfully!`);
     setGroupingTitle("");
+    setGroupingColor("bg-indigo-500");
   };
 
   const handleViewGroups = (grouping: Grouping) => {
@@ -75,17 +100,36 @@ export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, o
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="grouping-title">Grouping Title</Label>
+              <Label htmlFor="grouping-title" className="dark:text-slate-200">Grouping Title</Label>
               <Input
                 id="grouping-title"
                 value={groupingTitle}
                 onChange={(e) => setGroupingTitle(e.target.value)}
                 placeholder="e.g., Midterm Project"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="dark:text-slate-200">Color</Label>
+              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                {COLOR_OPTIONS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => setGroupingColor(color.value)}
+                    className={`w-10 h-10 rounded-md transition-all ${color.class} ${
+                      groupingColor === color.value
+                        ? "ring-2 ring-slate-900 dark:ring-slate-100 ring-offset-2 dark:ring-offset-slate-950 scale-110"
+                        : "hover:scale-105"
+                    }`}
+                    title={color.label}
+                  />
+                ))}
+              </div>
             </div>
             <Button
               onClick={handleCreateGrouping}
-              className="w-full bg-indigo-600 hover:bg-indigo-700"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >
               Create Grouping
             </Button>
@@ -102,12 +146,15 @@ export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, o
               key={grouping.id}
               grouping={grouping}
               onViewGroups={() => handleViewGroups(grouping)}
+              onUpdateGrouping={onUpdateGrouping}
+              onDeleteGrouping={onDeleteGrouping}
+              isAdmin={isAdmin}
             />
           ))}
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-slate-500">No groupings available for this subject yet.</p>
+          <p className="text-slate-500 dark:text-slate-500">No groupings available for this subject yet.</p>
         </div>
       )}
     </div>

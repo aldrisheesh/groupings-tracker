@@ -111,13 +111,13 @@ export function SubjectPage({ subject, groupings, onNavigate, onBack, isAdmin, o
             </div>
             <div className="space-y-2">
               <Label className="dark:text-slate-200">Color</Label>
-              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+              <div className="grid grid-cols-6 gap-2">
                 {COLOR_OPTIONS.map((color) => (
                   <button
                     key={color.value}
                     type="button"
                     onClick={() => setGroupingColor(color.value)}
-                    className={`w-10 h-10 rounded-md transition-all ${color.class} ${
+                    className={`h-12 rounded-lg transition-all ${color.class} ${
                       groupingColor === color.value
                         ? "ring-2 ring-slate-900 dark:ring-slate-100 ring-offset-2 dark:ring-offset-slate-950 scale-110"
                         : "hover:scale-105"

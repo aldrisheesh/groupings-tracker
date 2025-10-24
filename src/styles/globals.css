@@ -189,7 +189,7 @@ html {
 }
 
 /* Custom scrollbar styling - overlay scrollbars that don't cause layout shift */
-* {
+body, [data-scrollable="true"] {
   scrollbar-gutter: stable;
 }
 

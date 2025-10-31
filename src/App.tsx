@@ -60,7 +60,11 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>({
     type: "home",
   });
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Initialize admin mode from localStorage (defaults to false if not set)
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const saved = localStorage.getItem('adminMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   // Initialize dark mode from localStorage (defaults to false if not set)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
@@ -68,6 +72,11 @@ function App() {
   });
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
+
+  // Save admin mode to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('adminMode', JSON.stringify(isAdmin));
+  }, [isAdmin]);
 
   // Apply dark mode class to document
   useEffect(() => {

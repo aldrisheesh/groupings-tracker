@@ -473,6 +473,10 @@
     container: card-header / inline-size;
   }
 
+  .invisible {
+    visibility: hidden;
+  }
+
   .sr-only {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
@@ -605,6 +609,10 @@
 
   .mx-auto {
     margin-inline: auto;
+  }
+
+  .-mt-2 {
+    margin-top: calc(var(--spacing) * -2);
   }
 
   .mt-1 {
@@ -2252,6 +2260,18 @@
 
   .data-\[state\=open\]\:zoom-in-95[data-state="open"] {
     --tw-enter-scale: .95;
+  }
+
+  @media (width >= 40rem) {
+    .sm\:w-auto {
+      width: auto;
+    }
+  }
+
+  @media (width >= 40rem) {
+    .sm\:max-w-\[500px\] {
+      max-width: 500px;
+    }
   }
 
   @media (width >= 40rem) {

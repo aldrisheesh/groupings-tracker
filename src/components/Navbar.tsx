@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Menu, Users, ShieldCheck, Moon, Sun } from "lucide-react";
+import { Menu, Users, ShieldCheck, Moon, Sun, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetHeader } from "./ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { toast } from "sonner@2.0.3";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface NavbarProps {
   onNavigateHome: () => void;
@@ -13,14 +14,32 @@ interface NavbarProps {
   onToggleAdmin: (isAdmin: boolean) => void;
   isDarkMode: boolean;
   onToggleDarkMode: (isDarkMode: boolean) => void;
+  currentPage?: {
+    type: string;
+    subjectId?: string;
+    groupingId?: string;
+  };
+  subjectName?: string;
+  groupingTitle?: string;
 }
 
 const ADMIN_PASSWORD = "wer124SantosPogi";
 
-export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onToggleDarkMode }: NavbarProps) {
+export function Navbar({ 
+  onNavigateHome, 
+  isAdmin, 
+  onToggleAdmin, 
+  isDarkMode, 
+  onToggleDarkMode,
+  currentPage,
+  subjectName,
+  groupingTitle
+}: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [password, setPassword] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
 
   const handleAdminToggle = () => {
     if (isAdmin) {
@@ -44,6 +63,37 @@ export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onT
     }
   };
 
+  const handleShareClick = () => {
+    if (currentPage?.type === 'grouping' && currentPage.subjectId && currentPage.groupingId) {
+      const url = new URL(window.location.href);
+      url.search = ''; // Clear existing params
+      url.searchParams.set('subject', currentPage.subjectId);
+      url.searchParams.set('grouping', currentPage.groupingId);
+      setShareUrl(url.toString());
+      setIsShareDialogOpen(true);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const success = await copyToClipboard(shareUrl);
+    
+    if (success) {
+      toast.success("Link copied to clipboard!");
+      setIsShareDialogOpen(false);
+    } else {
+      // Select the text for manual copying
+      const input = document.getElementById('share-url-input') as HTMLInputElement;
+      if (input) {
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile devices
+      }
+      toast.info("Please copy the link manually (Ctrl+C or Cmd+C)");
+    }
+  };
+
+  // Only show share button on grouping pages
+  const showShareButton = currentPage?.type === 'grouping';
+
   return (
     <>
       <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-slate-900/50">
@@ -61,7 +111,17 @@ export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onT
             </button>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2">
+              {showShareButton && (
+                <Button
+                  onClick={handleShareClick}
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Share2 className="w-5 h-5" />
+                </Button>
+              )}
               <Button
                 onClick={() => onToggleDarkMode(!isDarkMode)}
                 variant="ghost"
@@ -93,6 +153,19 @@ export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onT
                   <SheetDescription>Access app settings and navigation options.</SheetDescription>
                 </SheetHeader>
                 <div className="flex flex-col gap-4 mt-8">
+                  {showShareButton && (
+                    <Button
+                      onClick={() => {
+                        handleShareClick();
+                        setIsOpen(false);
+                      }}
+                      variant="ghost"
+                      className="flex items-center gap-2 justify-start text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <Share2 className="w-5 h-5" />
+                      Share Page
+                    </Button>
+                  )}
                   <Button
                     onClick={() => {
                       onToggleDarkMode(!isDarkMode);
@@ -162,6 +235,51 @@ export function Navbar({ onNavigateHome, isAdmin, onToggleAdmin, isDarkMode, onT
               Authenticate
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Link Dialog */}
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] dark:bg-slate-900 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-slate-100">Share Grouping Page</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">
+              Share this link to give others direct access to {groupingTitle ? `"${groupingTitle}"` : 'this grouping'} in {subjectName || 'this subject'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-0">
+            <div className="space-y-2">
+              <Label htmlFor="share-url-input" className="text-sm dark:text-slate-300">Link</Label>
+              <Input
+                id="share-url-input"
+                value={shareUrl}
+                readOnly
+                onClick={(e) => {
+                  const input = e.target as HTMLInputElement;
+                  input.select();
+                }}
+                className="font-mono text-sm dark:bg-slate-800 dark:border-slate-700"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsShareDialogOpen(false)}
+              className="w-full sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={handleCopyLink}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            >
+              Copy Link
+            </Button>
+          </DialogFooter>
+          <p className="text-xs text-slate-500 dark:text-slate-500 text-center -mt-2 pt-4">
+            Tip: Click the link above to select it, then press Ctrl+C
+          </p>
         </DialogContent>
       </Dialog>
     </>

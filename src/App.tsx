@@ -77,6 +77,40 @@ function App() {
   const [groupings, setGroupings] = useState<Grouping[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
+  // Helper function to update URL without reload
+  const updateURL = (page: Page) => {
+    const url = new URL(window.location.href);
+    url.search = ''; // Clear existing params
+    
+    if (page.type === 'subject') {
+      url.searchParams.set('subject', page.subjectId);
+    } else if (page.type === 'grouping') {
+      url.searchParams.set('subject', page.subjectId);
+      url.searchParams.set('grouping', page.groupingId);
+    }
+    
+    window.history.pushState({}, '', url.toString());
+  };
+
+  // Custom setCurrentPage that also updates URL
+  const navigateToPage = (page: Page) => {
+    setCurrentPage(page);
+    updateURL(page);
+  };
+
+  // Parse URL on mount and navigate if params exist
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const subjectId = params.get('subject');
+    const groupingId = params.get('grouping');
+
+    if (subjectId && groupingId) {
+      setCurrentPage({ type: 'grouping', subjectId, groupingId });
+    } else if (subjectId) {
+      setCurrentPage({ type: 'subject', subjectId });
+    }
+  }, []);
+
   // Load all data on mount
   useEffect(() => {
     loadAllData();
@@ -344,7 +378,7 @@ function App() {
     if (success) {
       setSubjects(subjects.filter((s) => s.id !== id));
       setGroupings(groupings.filter((g) => g.subjectId !== id));
-      setCurrentPage({ type: "home" });
+      navigateToPage({ type: "home" });
       toast.success("Subject deleted successfully");
     } else {
       toast.error("Failed to delete subject");
@@ -829,6 +863,21 @@ function App() {
     );
   }
 
+  // Get current subject and grouping names for the navbar
+  const getCurrentPageInfo = () => {
+    if (currentPage.type === 'grouping') {
+      const subject = subjects.find(s => s.id === currentPage.subjectId);
+      const grouping = groupings.find(g => g.id === currentPage.groupingId);
+      return {
+        subjectName: subject?.name,
+        groupingTitle: grouping?.title,
+      };
+    }
+    return {};
+  };
+
+  const { subjectName, groupingTitle } = getCurrentPageInfo();
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Navbar
@@ -836,13 +885,16 @@ function App() {
         onToggleAdmin={(value) => setIsAdmin(value)}
         isDarkMode={isDarkMode}
         onToggleDarkMode={(value) => setIsDarkMode(value)}
-        onNavigateHome={() => setCurrentPage({ type: "home" })}
+        onNavigateHome={() => navigateToPage({ type: "home" })}
+        currentPage={currentPage}
+        subjectName={subjectName}
+        groupingTitle={groupingTitle}
       />
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         {currentPage.type === "home" && (
           <SubjectsPage
             subjects={subjects}
-            onNavigate={(page) => setCurrentPage(page)}
+            onNavigate={(page) => navigateToPage(page)}
             onCreateSubject={handleCreateSubject}
             onUpdateSubject={handleUpdateSubject}
             onDeleteSubject={handleDeleteSubject}
@@ -862,7 +914,7 @@ function App() {
             );
 
             if (!subject) {
-              setCurrentPage({ type: "home" });
+              navigateToPage({ type: "home" });
               return null;
             }
 
@@ -870,11 +922,11 @@ function App() {
               <SubjectPage
                 subject={subject}
                 groupings={subjectGroupings}
-                onNavigate={(page) => setCurrentPage(page)}
+                onNavigate={(page) => navigateToPage(page)}
                 onCreateGrouping={handleCreateGrouping}
                 onUpdateGrouping={handleUpdateGrouping}
                 onDeleteGrouping={handleDeleteGrouping}
-                onBack={() => setCurrentPage({ type: "home" })}
+                onBack={() => navigateToPage({ type: "home" })}
                 isAdmin={isAdmin}
               />
             );
@@ -892,7 +944,7 @@ function App() {
             );
 
             if (!subject || !grouping) {
-              setCurrentPage({
+              navigateToPage({
                 type: "subject",
                 subjectId: currentPage.subjectId,
               });
@@ -912,7 +964,7 @@ function App() {
                 onRemoveMember={handleRemoveMember}
                 onDeleteGroup={handleDeleteGroup}
                 onBack={() =>
-                  setCurrentPage({
+                  navigateToPage({
                     type: "subject",
                     subjectId: currentPage.subjectId,
                   })

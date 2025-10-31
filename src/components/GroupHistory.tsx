@@ -83,34 +83,36 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
         entry.actionType === "representative_set"
     );
 
-    // Group consecutive similar actions within 5 seconds
+    // Group similar actions within 5 seconds by action type and group name
     const processed: ProcessedHistoryEntry[] = [];
-    let i = 0;
+    const used = new Set<string>();
 
-    while (i < filteredHistory.length) {
+    for (let i = 0; i < filteredHistory.length; i++) {
+      if (used.has(filteredHistory[i].id)) continue;
+
       const current = filteredHistory[i];
 
       // Try to batch member_added or member_removed actions
       if (current.actionType === "member_added" || current.actionType === "member_removed") {
         const batchMembers = [current.memberName!];
-        let j = i + 1;
+        used.add(current.id);
 
         const currentTime = new Date(current.createdAt).getTime();
 
-        // Look ahead for similar consecutive actions
-        while (j < filteredHistory.length) {
-          const next = filteredHistory[j];
-          const nextTime = new Date(next.createdAt).getTime();
+        // Look for similar actions in the entire list within time window
+        for (let j = i + 1; j < filteredHistory.length; j++) {
+          if (used.has(filteredHistory[j].id)) continue;
+
+          const candidate = filteredHistory[j];
+          const candidateTime = new Date(candidate.createdAt).getTime();
 
           if (
-            next.actionType === current.actionType && // Same action type (add or remove)
-            next.groupName === current.groupName &&   // Same group
-            currentTime - nextTime <= 5000            // Within 5 seconds
+            candidate.actionType === current.actionType && // Same action type (add or remove)
+            candidate.groupName === current.groupName &&   // Same group
+            Math.abs(currentTime - candidateTime) <= 5000  // Within 5 seconds
           ) {
-            batchMembers.push(next.memberName!);
-            j++;
-          } else {
-            break;
+            batchMembers.push(candidate.memberName!);
+            used.add(candidate.id);
           }
         }
 
@@ -136,8 +138,6 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
             createdAt: current.createdAt,
           });
         }
-
-        i = j;
       } else {
         // Representative set or other action - add as single entry
         processed.push({
@@ -149,7 +149,7 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
           performedBy: current.performedBy,
           createdAt: current.createdAt,
         });
-        i++;
+        used.add(current.id);
       }
     }
 

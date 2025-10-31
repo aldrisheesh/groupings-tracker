@@ -107,7 +107,7 @@ export function Navbar({
               <div className="w-8 h-8 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
                 <Users className="w-5 h-5 text-white" />
               </div>
-              <span className="text-slate-900 dark:text-slate-50">Groupings Tracker</span>
+              <span className="text-slate-900 dark:text-slate-50">BSIT 3-2N Group Tracker</span>
             </button>
 
             {/* Desktop Navigation */}

@@ -41,9 +41,9 @@ This document explains how all the pieces of Groupings Tracker fit together.
 │  │  │ subjects │  │ students │  │ groupings │             │  │
 │  │  └──────────┘  └──────────┘  └───────────┘             │  │
 │  │       ↓             ↓              ↓                     │  │
-│  │  ┌──────────┐  ┌────────────────┐                       │  │
-│  │  │  groups  │  │ group_members  │                       │  │
-│  │  └──────────┘  └────────────────┘                       │  │
+│  │  ┌──────────┐  ┌────────────────┐  ┌──────────────┐   │  │
+│  │  │  groups  │  │ group_members  │  │group_history │   │  │
+│  │  └──────────┘  └────────────────┘  └──────────────┘   │  │
 │  │                                                          │  │
 │  │  ┌──────────────────────────────────────────────────┐   │  │
 │  │  │         Row Level Security (RLS)                 │   │  │
@@ -125,33 +125,43 @@ This document explains how all the pieces of Groupings Tracker fit together.
 
 ## 🔑 Key Concepts
 
-### 1. Client-Side State Management
+### 1. Client-Side State Management with Real-Time Sync
 
 **What it is:**
 - React `useState` hooks store data in browser memory
-- Fast UI updates without waiting for server
+- Supabase real-time subscriptions keep all users synchronized
+- Fast UI updates without manual refresh
 
 **How it works:**
 ```tsx
 const [groups, setGroups] = useState<Group[]>([]);
 
-// When user joins a group:
+// When user joins a group locally:
 setGroups(groups.map(g => 
   g.id === groupId 
     ? {...g, members: [...g.members, newMember]}
     : g
 ));
+
+// Real-time subscription updates other users:
+supabase.channel('group_members')
+  .on('INSERT', (payload) => {
+    // Automatically update state when others join
+    setGroups(prev => /* update with new member */);
+  })
+  .subscribe();
 ```
 
 **Why we use it:**
-- Instant UI feedback
-- No loading spinners for every action
-- Better user experience
+- Instant UI feedback for the acting user
+- Automatic sync across all connected users
+- No manual refresh needed
+- Better collaborative experience
 
-**Limitation:**
-- Each user has their own copy
-- Must refresh to see changes from other users
-- (Can be solved with real-time subscriptions)
+**Benefits:**
+- Changes appear instantly for all users (typically 100-300ms)
+- No polling or periodic refreshes
+- Efficient use of bandwidth
 
 ---
 
@@ -366,8 +376,9 @@ App.tsx
 subjects (1)
     ├─→ students (many)
     └─→ groupings (many)
-            └─→ groups (many)
-                    └─→ group_members (many)
+            ├─→ groups (many)
+            │       └─→ group_members (many)
+            └─→ group_history (many)
 ```
 
 **Explained:**
@@ -382,6 +393,8 @@ students.subject_id → subjects.id
 groupings.subject_id → subjects.id
 groups.grouping_id → groupings.id
 group_members.group_id → groups.id
+group_history.grouping_id → groupings.id
+group_history.group_id → groups.id (nullable)
 ```
 
 ---
@@ -423,9 +436,9 @@ Local Development
 
 ---
 
-## 🔄 Real-Time Updates (Optional Enhancement)
+## 🔄 Real-Time Updates (Already Implemented)
 
-Currently, users must refresh to see changes from others. You can add real-time:
+The app uses Supabase real-time subscriptions to sync changes across all users instantly:
 
 ```tsx
 useEffect(() => {

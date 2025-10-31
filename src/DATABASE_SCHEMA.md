@@ -46,16 +46,19 @@ Stores grouping categories within each subject (e.g., "Final Project", "Lab Part
 | `id` | UUID | Primary key |
 | `subject_id` | UUID | Foreign key to `subjects` |
 | `title` | TEXT | Grouping category name |
+| `color` | TEXT | Hex color code for visual customization |
 | `locked` | BOOLEAN | Whether users can join/leave groups |
 | `created_at` | TIMESTAMP | Auto-generated creation time |
 
 **Relationships**:
 - Belongs to one `subject`
 - Has many `groups`
+- Has many `group_history` records
 
 **Notes**:
 - Cascades on subject deletion
 - `locked` defaults to `false`
+- `color` stores hex values like `#3b82f6`
 
 ---
 
@@ -105,6 +108,42 @@ Stores individual member assignments to groups.
 
 ---
 
+### 6. `group_history`
+Stores audit log of all group-related actions for tracking and accountability.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `grouping_id` | UUID | Foreign key to `groupings` |
+| `group_id` | UUID | Foreign key to `groups` (nullable) |
+| `action_type` | TEXT | Type of action performed |
+| `group_name` | TEXT | Name of the group affected |
+| `member_name` | TEXT | Name of the member (if applicable) |
+| `details` | TEXT | Additional context about the action |
+| `performed_by` | TEXT | Whether action was by 'admin' or 'user' |
+| `created_at` | TIMESTAMP | Auto-generated timestamp of action |
+
+**Relationships**:
+- Belongs to one `grouping`
+- May reference one `group` (nullable for group deletion events)
+
+**Action Types**:
+- `group_created` - New group was created
+- `group_deleted` - Group was removed
+- `member_added` - Member joined or was added to group
+- `member_removed` - Member left or was removed from group
+- `group_updated` - Group details (name/limit) changed
+- `representative_set` - Representative assigned
+- `representative_removed` - Representative unassigned
+
+**Notes**:
+- Cascades on grouping deletion
+- Provides complete audit trail
+- Real-time updates via Supabase subscriptions
+- Useful for tracking group formation and changes
+
+---
+
 ## Indexes
 
 For optimal query performance:
@@ -114,6 +153,8 @@ idx_students_subject_id      ON students(subject_id)
 idx_groupings_subject_id     ON groupings(subject_id)
 idx_groups_grouping_id       ON groups(grouping_id)
 idx_group_members_group_id   ON group_members(group_id)
+idx_group_history_grouping   ON group_history(grouping_id)
+idx_group_history_group      ON group_history(group_id)
 ```
 
 ---

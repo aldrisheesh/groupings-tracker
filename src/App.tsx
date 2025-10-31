@@ -61,16 +61,24 @@ function App() {
     type: "home",
   });
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Initialize dark mode from localStorage (defaults to false if not set)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
   // Apply dark mode class to document
-  if (isDarkMode) {
-    document.documentElement.classList.add("dark");
-  } else {
-    document.documentElement.classList.remove("dark");
-  }
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    // Save to localStorage whenever it changes
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
 
   // Data from Supabase
   const [subjects, setSubjects] = useState<Subject[]>([]);

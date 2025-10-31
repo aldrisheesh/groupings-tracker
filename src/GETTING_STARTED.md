@@ -58,24 +58,50 @@ A web application where:
 
 ---
 
-### ✅ Step 4: Verify Setup (2 min)
+### ✅ Step 4: Enable Real-Time Updates (2 min)
+
+1. Go back to **"SQL Editor"** in Supabase
+2. Click **"New query"**
+3. Copy the contents of `/supabase/migrations/002_enable_realtime.sql`
+4. Paste into SQL Editor
+5. Click **"Run"**
+6. Should see: ✅ "Success. No rows returned"
+
+**✓ Done when:** You see success message
+
+### ✅ Step 5: Enable Grouping Colors & History (2 min)
+
+1. Still in **"SQL Editor"**
+2. Click **"New query"**
+3. Copy the contents of `/supabase/migrations/003_add_grouping_colors_and_history.sql`
+4. Paste into SQL Editor
+5. Click **"Run"**
+6. Should see: ✅ "Success. No rows returned"
+
+**✓ Done when:** You see success message
+
+### ✅ Step 6: Verify Setup (2 min)
 
 1. Click **"Table Editor"** (left sidebar)
-2. You should see 5 tables:
+2. You should see 6 tables:
    - subjects
    - students
    - groupings
    - groups
    - group_members
+   - group_history
 
 3. Click on "subjects" table
 4. You should see 6 sample subjects (Mathematics, Physics, etc.)
+
+5. Click on "groupings" table
+6. You should see a "color" column
 
 **✓ Done when:** You see all tables with sample data
 
 ---
 
-### ✅ Step 5: Test Locally (3 min)
+### ✅ Step 7: Test Locally (3 min)
 
 1. In your code editor/terminal, run:
    ```bash
@@ -142,11 +168,13 @@ Now that it's set up, let's learn by doing:
 
 #### Task 1: Toggle Admin Mode
 1. Look at top-right corner
-2. Click the shield icon
-3. Notice new buttons appear
-4. Click shield again to toggle back
+2. Click the "User Mode" button
+3. Enter password: `wer124SantosPogi`
+4. Click "Authenticate"
+5. Notice button changes to "Admin Mode" and new features appear
+6. Click "Admin Mode" again to toggle back
 
-**What you learned:** Admin vs user permissions
+**What you learned:** Admin authentication and permissions
 
 ---
 
@@ -185,10 +213,11 @@ Now that it's set up, let's learn by doing:
 1. Still in Biology subject
 2. Scroll to "Grouping Categories"
 3. Type "Lab Partners" in the input
-4. Click "Add Grouping"
-5. See it appear!
+4. Choose a color (e.g., green, blue, purple)
+5. Click "Add Grouping"
+6. See it appear with your chosen color!
 
-**What you learned:** Creating related data
+**What you learned:** Creating related data with custom styling
 
 ---
 
@@ -229,9 +258,58 @@ Now that it's set up, let's learn by doing:
 
 ---
 
+#### Task 8: Test Dark Mode Persistence
+1. Click the moon/sun icon in top-right navbar
+2. Toggle to dark mode
+3. See the entire app switch to dark theme
+4. Refresh the page (F5 or Ctrl+R)
+5. Notice dark mode is still active!
+6. Toggle back to light mode if desired
+
+**What you learned:** Persistent user preferences
+
+---
+
+#### Task 9: Share a Grouping Page
+1. Navigate to any grouping page
+2. Look for the share icon in the navbar (next to dark mode toggle)
+3. Click the share icon
+4. See a modal with a shareable link
+5. Click "Copy Link"
+6. Open a new incognito window and paste the link
+7. Notice it takes you directly to that grouping!
+
+**What you learned:** Deep linking and sharing functionality
+
+---
+
+#### Task 10: Export Groups to CSV
+1. Toggle admin mode ON
+2. Navigate to any grouping with groups
+3. Click the download icon (near the lock button)
+4. CSV file downloads with all group data
+5. Open the CSV in Excel or Google Sheets
+6. See all groups and their members
+
+**What you learned:** Data export for record-keeping
+
+---
+
+#### Task 11: View Group History
+1. In any grouping with activity
+2. Click the "History" button
+3. See a list of all changes (members added, removed, etc.)
+4. Notice the real-time timestamp for each action
+5. Try adding a member to a group
+6. Watch the history update automatically!
+
+**What you learned:** Activity tracking and audit logs
+
+---
+
 ### 🌟 Intermediate Tasks (10 min each)
 
-#### Task 8: Assign Representative
+#### Task 12: Assign Representative
 1. In a group with members
 2. Hover over a member name
 3. Click the crown icon (👑)
@@ -243,7 +321,7 @@ Now that it's set up, let's learn by doing:
 
 ---
 
-#### Task 9: Test Multi-User
+#### Task 13: Test Multi-User Real-Time Updates
 1. Open app in incognito/different browser
 2. In original window: Create a new subject
 3. In incognito window: Refresh page
@@ -253,16 +331,17 @@ Now that it's set up, let's learn by doing:
 
 ---
 
-#### Task 10: Test Lock Across Users
+#### Task 14: Test Real-Time Lock Updates
 1. Keep both windows open (normal + incognito)
 2. In normal window (as admin): Lock a grouping
-3. In incognito window: Refresh
-4. Try to join a group - it's locked!
-5. In normal window: Unlock
-6. In incognito window: Refresh
-7. Can join again!
+3. In incognito window: Wait a moment (no refresh needed!)
+4. Watch the lock badge appear automatically
+5. Try to join a group - it's locked!
+6. In normal window: Unlock
+7. In incognito window: Watch it unlock automatically
+8. Can join again!
 
-**What you learned:** Locks work for everyone
+**What you learned:** Real-time sync across all users
 
 ---
 
@@ -340,7 +419,11 @@ For a school project, you won't hit limits.
 ---
 
 ### Q: Can multiple admins exist?
-**A:** Currently, anyone can toggle admin mode.
+**A:** Currently, anyone who knows the password can access admin mode.
+
+**Admin Password:** `wer124SantosPogi`
+
+To change the password, edit `/components/Navbar.tsx` and update the `ADMIN_PASSWORD` constant.
 
 For production, you'd want to:
 1. Add user authentication
@@ -418,15 +501,20 @@ Better for learning: Keep it simple first!
 
 You're ready to use the app when you can:
 
-- [ ] Toggle admin mode
+- [ ] Toggle admin mode with password
 - [ ] Create a new subject
 - [ ] Add students (single and batch)
-- [ ] Create a grouping category
+- [ ] Create a grouping category with custom color
 - [ ] Create a group
 - [ ] Join a group as a user
 - [ ] Assign a group representative
 - [ ] Lock a grouping
-- [ ] See changes in different browser
+- [ ] Export groups to CSV
+- [ ] View group history
+- [ ] Share a grouping page link
+- [ ] Toggle dark mode
+- [ ] Verify dark mode persists after refresh
+- [ ] See real-time changes in different browser without refreshing
 - [ ] Navigate smoothly between pages
 
 ---

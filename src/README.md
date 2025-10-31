@@ -13,18 +13,24 @@ A modern, clean, and minimal dashboard-style web app for managing student groups
 
 ### 👥 Group Management
 - Create unlimited subjects (courses/classes)
-- Add grouping categories (Final Project, Lab Partners, etc.)
+- Add grouping categories with customizable colors
 - Create groups with customizable member limits
 - Batch add members (admin) or self-join (users)
+- Fuzzy name matching for joining groups
 - Assign group representatives with crown icon
 - Visual status indicators (Available/Full)
+- CSV export of groups for admins
+- Group history/changelog with real-time tracking
 
 ### 🔒 Admin Controls
-- Toggle admin mode with dedicated controls
+- Toggle admin mode with password protection
 - Lock groupings to prevent member changes
 - Batch enroll students (one per line)
 - Full CRUD operations on all entities
 - Delete protection with confirmation dialogs
+- Export group data to CSV format
+- View complete group history and changes
+- Remove members even from locked groupings
 
 ### 📊 Smart Features
 - Duplicate detection with visual highlighting
@@ -35,9 +41,11 @@ A modern, clean, and minimal dashboard-style web app for managing student groups
 
 ### 🎨 User Experience
 - Fully responsive (mobile, tablet, desktop)
-- Dark mode support
+- Dark mode with persistent preferences
 - Smooth animations and transitions
 - Toast notifications for all actions
+- Deep linking for sharing specific grouping pages
+- Share button with clipboard fallback
 - Keyboard shortcuts (Enter to submit, Ctrl+Enter for batch)
 - Accessible UI components (shadcn/ui)
 
@@ -185,7 +193,9 @@ groupings-tracker/
 ### For Administrators
 
 1. **Enable Admin Mode**
-   - Click the shield toggle in top-right navbar
+   - Click the "User Mode" button in top-right navbar
+   - Enter admin password when prompted
+   - Default password: `wer124SantosPogi`
 
 2. **Create a Subject**
    - Click "Add New Subject"
@@ -202,6 +212,7 @@ groupings-tracker/
 4. **Create Grouping**
    - In subject view, scroll to "Grouping Categories"
    - Enter grouping title (e.g., "Final Project")
+   - Choose a color for the grouping
    - Click "Add Grouping"
 
 5. **Create Groups**
@@ -214,6 +225,23 @@ groupings-tracker/
    - In grouping view, click "Lock Grouping"
    - Users can view but not join/leave
    - Representatives can still be assigned
+   - Admins can still remove members
+
+7. **Export Groups to CSV** (Optional)
+   - In grouping view, click the download icon
+   - CSV file includes all groups and members
+   - Useful for record-keeping and grading
+
+8. **View Group History**
+   - In grouping view, click "History" button
+   - See all changes made to groups
+   - Track who joined, left, or was removed
+   - Real-time updates as changes occur
+
+9. **Share Grouping Page**
+   - In grouping view, click share icon in navbar
+   - Copy the direct link to share with students
+   - Link takes users directly to that grouping
 
 ### For Students/Users
 
@@ -235,6 +263,17 @@ groupings-tracker/
    - Hover over a member's name
    - Click the crown icon
    - Click again to unassign
+
+5. **Share a Grouping Page**
+   - Click the share icon in the navbar (when viewing a grouping)
+   - Click "Copy Link" in the modal
+   - Share the link with classmates
+   - They'll be taken directly to that grouping
+
+6. **View Group History**
+   - Click "History" button to see all changes
+   - See who joined, left, or was added to groups
+   - Track group formation over time
 
 ---
 
@@ -260,10 +299,11 @@ import { YourIcon } from "lucide-react";
 
 Common additions:
 - Email notifications
-- CSV export
 - Group chat integration
 - Attendance tracking
 - File uploads per group
+- User authentication
+- Custom admin passwords
 
 ---
 
@@ -284,6 +324,21 @@ Common additions:
 - **Check**: Grouping has `locked` column
 - **Check**: Admin toggled lock successfully
 - **Fix**: Check Supabase for `locked = true`
+
+### Admin mode won't activate
+- **Check**: Using correct password (`wer124SantosPogi`)
+- **Check**: No typos or extra spaces
+- **Fix**: Password is case-sensitive
+
+### Dark mode doesn't persist
+- **Check**: Browser allows localStorage
+- **Check**: Not in private/incognito mode
+- **Fix**: Clear browser cache and try again
+
+### Share link not working
+- **Check**: You're on a grouping page (not home or subject page)
+- **Check**: Share icon appears in navbar
+- **Fix**: Navigate to a specific grouping first
 
 ### Name format errors
 - **Format**: `Last Name, First Name`

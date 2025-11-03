@@ -23,6 +23,7 @@ interface GroupingPageProps {
   onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
   onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
+  onDeleteAllGroups: (groupingId: string) => void;
   onBack: () => void;
   isAdmin: boolean;
   onToggleGroupingLock: (groupingId: string) => void;
@@ -79,6 +80,7 @@ export function GroupingPage({
   onUpdateGroup,
   onRemoveMember,
   onDeleteGroup,
+  onDeleteAllGroups,
   onBack,
   isAdmin,
   onToggleGroupingLock,
@@ -294,7 +296,9 @@ export function GroupingPage({
         <div className="border-t border-slate-200 dark:border-slate-800 pt-8">
           <CreateGroupForm
             groupingId={grouping.id}
+            groups={groups}
             onCreateGroup={onCreateGroup}
+            onDeleteAllGroups={onDeleteAllGroups}
           />
         </div>
       )}

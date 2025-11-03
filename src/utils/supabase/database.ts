@@ -421,6 +421,34 @@ export async function deleteGroup(id: string): Promise<boolean> {
   return true;
 }
 
+export async function deleteAllGroupsInGrouping(groupingId: string): Promise<boolean> {
+  // Get all groups for this grouping
+  const { data: groups } = await supabase
+    .from('groups')
+    .select('id')
+    .eq('grouping_id', groupingId);
+
+  if (groups && groups.length > 0) {
+    const groupIds = groups.map(g => g.id);
+
+    // Delete all group members
+    await supabase.from('group_members').delete().in('group_id', groupIds);
+
+    // Delete all group history entries for this grouping
+    await supabase.from('group_history').delete().eq('grouping_id', groupingId);
+
+    // Delete all groups
+    const { error } = await supabase.from('groups').delete().eq('grouping_id', groupingId);
+
+    if (error) {
+      console.error('Error deleting groups:', error);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function addMemberToGroup(groupId: string, memberName: string): Promise<boolean> {
   const newMember = {
     id: crypto.randomUUID(),

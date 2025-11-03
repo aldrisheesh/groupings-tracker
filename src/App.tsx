@@ -247,7 +247,12 @@ function App() {
               representative: payload.new.representative || undefined,
             };
             setGroups((prev) => {
-              if (prev.some(g => g.id === newGroup.id)) return prev;
+              const exists = prev.some(g => g.id === newGroup.id);
+              if (exists) {
+                console.log(`Group ${newGroup.id} already exists, skipping duplicate`);
+                return prev;
+              }
+              console.log(`Adding new group via realtime: ${newGroup.id} - ${newGroup.name}`);
               return [...prev, newGroup];
             });
           } else if (payload.eventType === 'UPDATE') {
@@ -264,7 +269,7 @@ function App() {
               )
             );
           } else if (payload.eventType === 'DELETE') {
-            setGroups(groups.filter((g) => g.id !== payload.old.id));
+            setGroups((prev) => prev.filter((g) => g.id !== payload.old.id));
           }
         }
       )
@@ -319,6 +324,8 @@ function App() {
       groupMembersChannel.unsubscribe();
     };
   }, [loading, dbError]);
+
+
 
   const loadAllData = async () => {
     setLoading(true);
@@ -549,7 +556,9 @@ function App() {
       memberLimit,
     );
     if (newGroup) {
-      setGroups([...groups, newGroup]);
+      console.log(`Created group in DB: ${newGroup.id} - ${newGroup.name}`);
+      // Don't update local state - let real-time subscription handle it
+      // This prevents duplicates from race conditions
       // Don't log group creation to keep history focused on member changes
       toast.success(`${groupName} created successfully!`);
     } else {
@@ -579,10 +588,17 @@ function App() {
           isAdmin ? 'admin' : 'user'
         );
       }
-      setGroups(
-        groups.map((g) =>
+      // Update local state for immediate feedback
+      // Real-time subscription will also fire, but has duplicate prevention
+      setGroups((prevGroups) =>
+        prevGroups.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, memberName] }
+            ? { 
+                ...g, 
+                members: g.members.includes(memberName) 
+                  ? g.members 
+                  : [...g.members, memberName] 
+              }
             : g,
         ),
       );
@@ -615,10 +631,18 @@ function App() {
           );
         }
       }
-      setGroups(
-        groups.map((g) =>
+      // Update local state for immediate feedback
+      // Real-time subscription will also fire, but has duplicate prevention
+      setGroups((prevGroups) =>
+        prevGroups.map((g) =>
           g.id === groupId
-            ? { ...g, members: [...g.members, ...memberNames] }
+            ? { 
+                ...g, 
+                members: [
+                  ...g.members,
+                  ...memberNames.filter(name => !g.members.includes(name))
+                ]
+              }
             : g,
         ),
       );
@@ -651,8 +675,8 @@ function App() {
         // Don't log representative removal or other updates
       }
       
-      setGroups(
-        groups.map((g) =>
+      setGroups((prevGroups) =>
+        prevGroups.map((g) =>
           g.id === groupId ? { ...g, ...updatedGroup } : g,
         ),
       );
@@ -683,8 +707,10 @@ function App() {
           isAdmin ? 'admin' : 'user'
         );
       }
-      setGroups(
-        groups.map((g) =>
+      // Update local state for immediate feedback
+      // Real-time subscription will also fire for other users
+      setGroups((prevGroups) =>
+        prevGroups.map((g) =>
           g.id === groupId
             ? {
                 ...g,
@@ -704,9 +730,20 @@ function App() {
     const success = await db.deleteGroup(groupId);
     if (success) {
       // Don't log group deletion to keep history focused on member changes
-      setGroups(groups.filter((g) => g.id !== groupId));
+      setGroups((prevGroups) => prevGroups.filter((g) => g.id !== groupId));
     } else {
       toast.error("Failed to delete group");
+    }
+  };
+
+  const handleDeleteAllGroups = async (groupingId: string) => {
+    const success = await db.deleteAllGroupsInGrouping(groupingId);
+    if (success) {
+      // Remove all groups for this grouping from state
+      setGroups((prevGroups) => prevGroups.filter((g) => g.groupingId !== groupingId));
+      toast.success("All groups removed successfully!");
+    } else {
+      toast.error("Failed to remove all groups");
     }
   };
 
@@ -956,9 +993,15 @@ function App() {
             const grouping = groupings.find(
               (g) => g.id === currentPage.groupingId,
             );
-            const groupingGroups = groups.filter(
-              (g) => g.groupingId === currentPage.groupingId,
-            );
+            // Filter and deduplicate groups for this grouping
+            const groupingGroups = groups
+              .filter((g) => g.groupingId === currentPage.groupingId)
+              .reduce((unique: Group[], group) => {
+                if (!unique.some(g => g.id === group.id)) {
+                  unique.push(group);
+                }
+                return unique;
+              }, []);
 
             if (!subject || !grouping) {
               navigateToPage({
@@ -980,6 +1023,7 @@ function App() {
                 onUpdateGroup={handleUpdateGroup}
                 onRemoveMember={handleRemoveMember}
                 onDeleteGroup={handleDeleteGroup}
+                onDeleteAllGroups={handleDeleteAllGroups}
                 onBack={() =>
                   navigateToPage({
                     type: "subject",

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "./components/Navbar";
+import { Footer } from "./components/Footer";
 import { SubjectsPage } from "./components/SubjectsPage";
 import { SubjectPage } from "./components/SubjectPage";
 import { GroupingPage } from "./components/GroupingPage";
@@ -98,14 +99,14 @@ function App() {
   const updateURL = (page: Page) => {
     const url = new URL(window.location.href);
     url.search = ''; // Clear existing params
-    
+
     if (page.type === 'subject') {
       url.searchParams.set('subject', page.subjectId);
     } else if (page.type === 'grouping') {
       url.searchParams.set('subject', page.subjectId);
       url.searchParams.set('grouping', page.groupingId);
     }
-    
+
     window.history.pushState({}, '', url.toString());
   };
 
@@ -147,7 +148,7 @@ function App() {
         { event: '*', schema: 'public', table: 'subjects' },
         async (payload: RealtimePostgresChangesPayload<any>) => {
           console.log('Subjects change received:', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             const newSubject = await db.fetchSubjects();
             const inserted = newSubject.find((s: Subject) => s.id === payload.new.id);
@@ -194,7 +195,7 @@ function App() {
         { event: '*', schema: 'public', table: 'groupings' },
         async (payload: RealtimePostgresChangesPayload<any>) => {
           console.log('Groupings change received:', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             const newGrouping: Grouping = {
               id: payload.new.id,
@@ -212,11 +213,11 @@ function App() {
               prev.map((g) =>
                 g.id === payload.new.id
                   ? {
-                      ...g,
-                      title: payload.new.title,
-                      color: payload.new.color,
-                      locked: payload.new.locked,
-                    }
+                    ...g,
+                    title: payload.new.title,
+                    color: payload.new.color,
+                    locked: payload.new.locked,
+                  }
                   : g
               )
             );
@@ -236,7 +237,7 @@ function App() {
         { event: '*', schema: 'public', table: 'groups' },
         async (payload: RealtimePostgresChangesPayload<any>) => {
           console.log('Groups change received:', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             const newGroup: Group = {
               id: payload.new.id,
@@ -260,11 +261,11 @@ function App() {
               prev.map((g) =>
                 g.id === payload.new.id
                   ? {
-                      ...g,
-                      name: payload.new.name,
-                      memberLimit: payload.new.member_limit,
-                      representative: payload.new.representative || undefined,
-                    }
+                    ...g,
+                    name: payload.new.name,
+                    memberLimit: payload.new.member_limit,
+                    representative: payload.new.representative || undefined,
+                  }
                   : g
               )
             );
@@ -283,32 +284,28 @@ function App() {
         { event: '*', schema: 'public', table: 'group_members' },
         async (payload: RealtimePostgresChangesPayload<any>) => {
           console.log('Group members change received:', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             setGroups((prev) =>
               prev.map((g) =>
                 g.id === payload.new.group_id
                   ? {
-                      ...g,
-                      // Only add if not already present (prevent duplicates)
-                      members: g.members.includes(payload.new.member_name)
-                        ? g.members
-                        : [...g.members, payload.new.member_name],
-                    }
+                    ...g,
+                    // Only add if not already present (prevent duplicates)
+                    members: g.members.includes(payload.new.member_name)
+                      ? g.members
+                      : [...g.members, payload.new.member_name],
+                  }
                   : g
               )
             );
           } else if (payload.eventType === 'DELETE') {
-            setGroups((prev) =>
-              prev.map((g) =>
-                g.id === payload.old.group_id
-                  ? {
-                      ...g,
-                      members: g.members.filter((m) => m !== payload.old.member_name),
-                    }
-                  : g
-              )
-            );
+            console.log('Member removed, reloading groups to ensure sync...');
+            // Since DELETE payload might not contain detailed info (only ID) depending on Replica Identity,
+            // and our local state only stores member names (not IDs), we can't easily identify which group/member to remove.
+            // fetching fresh data is the most robust fix.
+            const updatedGroups = await db.fetchGroups();
+            setGroups(updatedGroups);
           }
         }
       )
@@ -460,11 +457,11 @@ function App() {
         subjects.map((s) =>
           s.id === subjectId
             ? {
-                ...s,
-                students: s.students.filter(
-                  (student) => student.id !== studentId,
-                ),
-              }
+              ...s,
+              students: s.students.filter(
+                (student) => student.id !== studentId,
+              ),
+            }
             : s,
         ),
       );
@@ -593,12 +590,12 @@ function App() {
       setGroups((prevGroups) =>
         prevGroups.map((g) =>
           g.id === groupId
-            ? { 
-                ...g, 
-                members: g.members.includes(memberName) 
-                  ? g.members 
-                  : [...g.members, memberName] 
-              }
+            ? {
+              ...g,
+              members: g.members.includes(memberName)
+                ? g.members
+                : [...g.members, memberName]
+            }
             : g,
         ),
       );
@@ -636,13 +633,13 @@ function App() {
       setGroups((prevGroups) =>
         prevGroups.map((g) =>
           g.id === groupId
-            ? { 
-                ...g, 
-                members: [
-                  ...g.members,
-                  ...memberNames.filter(name => !g.members.includes(name))
-                ]
-              }
+            ? {
+              ...g,
+              members: [
+                ...g.members,
+                ...memberNames.filter(name => !g.members.includes(name))
+              ]
+            }
             : g,
         ),
       );
@@ -674,7 +671,7 @@ function App() {
         }
         // Don't log representative removal or other updates
       }
-      
+
       setGroups((prevGroups) =>
         prevGroups.map((g) =>
           g.id === groupId ? { ...g, ...updatedGroup } : g,
@@ -713,11 +710,11 @@ function App() {
         prevGroups.map((g) =>
           g.id === groupId
             ? {
-                ...g,
-                members: g.members.filter(
-                  (m) => m !== memberName,
-                ),
-              }
+              ...g,
+              members: g.members.filter(
+                (m) => m !== memberName,
+              ),
+            }
             : g,
         ),
       );
@@ -933,7 +930,7 @@ function App() {
   const { subjectName, groupingTitle } = getCurrentPageInfo();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
       <Navbar
         isAdmin={isAdmin}
         onToggleAdmin={(value) => setIsAdmin(value)}
@@ -944,7 +941,7 @@ function App() {
         subjectName={subjectName}
         groupingTitle={groupingTitle}
       />
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
+      <main className="container mx-auto px-4 py-8 max-w-7xl flex-1">
         {currentPage.type === "home" && (
           <SubjectsPage
             subjects={subjects}
@@ -1036,6 +1033,7 @@ function App() {
             );
           })()}
       </main>
+      <Footer />
       <Toaster position="bottom-right" />
     </div>
   );

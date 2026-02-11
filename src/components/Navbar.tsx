@@ -25,11 +25,11 @@ interface NavbarProps {
 
 const ADMIN_PASSWORD = "wer124SantosPogi";
 
-export function Navbar({ 
-  onNavigateHome, 
-  isAdmin, 
-  onToggleAdmin, 
-  isDarkMode, 
+export function Navbar({
+  onNavigateHome,
+  isAdmin,
+  onToggleAdmin,
+  isDarkMode,
   onToggleDarkMode,
   currentPage,
   subjectName,
@@ -76,7 +76,7 @@ export function Navbar({
 
   const handleCopyLink = async () => {
     const success = await copyToClipboard(shareUrl);
-    
+
     if (success) {
       toast.success("Link copied to clipboard!");
       setIsShareDialogOpen(false);
@@ -104,8 +104,8 @@ export function Navbar({
               onClick={onNavigateHome}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
             >
-              <div className="w-8 h-8 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <Users className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 rounded-lg overflow-hidden shadow-lg shadow-indigo-500/20">
+                <img src="/favicon.svg" alt="Logo" className="w-full h-full object-cover" />
               </div>
               <span className="text-slate-900 dark:text-slate-50">BSIT 3-2N Group Tracker</span>
             </button>
@@ -222,8 +222,8 @@ export function Navbar({
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setIsPasswordDialogOpen(false);
                 setPassword("");
@@ -263,14 +263,14 @@ export function Navbar({
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsShareDialogOpen(false)}
               className="w-full sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Close
             </Button>
-            <Button 
+            <Button
               onClick={handleCopyLink}
               className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
             >

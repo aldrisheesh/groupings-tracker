@@ -221,14 +221,20 @@ Now that it's set up, let's learn by doing:
 
 ---
 
-#### Task 5: Create a Group
+#### Task 5: Create Groups (Single & Batch)
 1. Click on "Lab Partners" grouping
-2. Scroll to "Create New Group"
-3. Enter:
-   - Name: "Team 1"
-   - Member Limit: 2
-4. Click "Create Group"
-5. See the new group card!
+2. Scroll to "Add Groups"
+3. To create one group:
+   - Select "Single Group" tab
+   - Enter Name: "Team 1"
+   - Enter Member Limit: 2
+   - Click "Add Group"
+4. To create many groups:
+   - Select "Batch Create" tab
+   - Enter Number of Groups: 5
+   - Enter Member Limit: 6
+   - Click "Batch Create Groups"
+5. See your new groups in the list!
 
 **What you learned:** Groups belong to groupings
 

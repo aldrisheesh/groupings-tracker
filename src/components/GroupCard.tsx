@@ -60,19 +60,19 @@ const normalizeForMatching = (text: string): string => {
 const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
   const inputParts = inputName.trim().split(',').map(part => part.trim());
   if (inputParts.length !== 2) return false;
-  
+
   const [inputLastName, inputFirstName] = inputParts.map(normalizeForMatching);
-  
+
   return students.some(student => {
     const studentParts = student.name.trim().split(',').map(part => part.trim());
     if (studentParts.length !== 2) return false;
-    
+
     const [studentLastName, studentFirstName] = studentParts.map(normalizeForMatching);
-    
+
     // Last names must match (accent-insensitive)
     // First name: input must be contained in or equal to the enrolled name
-    return studentLastName === inputLastName && 
-           studentFirstName.includes(inputFirstName);
+    return studentLastName === inputLastName &&
+      studentFirstName.includes(inputFirstName);
   });
 };
 
@@ -81,24 +81,24 @@ const fuzzyMatchStudent = (inputName: string, students: Student[]): boolean => {
 const fuzzyMatchNames = (name1: string, name2: string): boolean => {
   const normalized1 = normalizeForMatching(name1);
   const normalized2 = normalizeForMatching(name2);
-  
+
   // Split by comma to get last name and first name
   const parts1 = normalized1.split(',').map(p => p.trim());
   const parts2 = normalized2.split(',').map(p => p.trim());
-  
+
   // Both must have last name and first name
   if (parts1.length !== 2 || parts2.length !== 2) {
     return normalized1 === normalized2;
   }
-  
+
   const [last1, first1] = parts1;
   const [last2, first2] = parts2;
-  
+
   // Last names must match exactly
   if (last1 !== last2) {
     return false;
   }
-  
+
   // First names: check if one contains the other (bidirectional)
   return first1.includes(first2) || first2.includes(first1);
 };
@@ -115,14 +115,14 @@ const isNameInAnyGroup = (name: string, groups: Group[]): { inGroup: boolean; gr
   return { inGroup: false };
 };
 
-export function GroupCard({ 
-  group, 
+export function GroupCard({
+  group,
   students,
   allGroups,
   onJoinGroup,
   onBatchJoinGroup,
-  onUpdateGroup, 
-  onRemoveMember, 
+  onUpdateGroup,
+  onRemoveMember,
   onDeleteGroup,
   isAdmin,
   isLocked,
@@ -210,7 +210,7 @@ export function GroupCard({
     }
 
     // Check if any names are already members
-    const alreadyMembers = names.filter(name => 
+    const alreadyMembers = names.filter(name =>
       group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
     );
     if (alreadyMembers.length > 0) {
@@ -292,16 +292,14 @@ export function GroupCard({
   return (
     <>
       {/* Main Group Card */}
-      <Card 
-        className={`flex flex-col h-full gap-0 hover:shadow-lg transition-shadow dark:border-slate-800 ${
-          isFull 
-            ? "border-slate-300 dark:border-slate-700 dark:bg-slate-900" 
+      <Card
+        className={`flex flex-col h-full gap-0 hover:shadow-lg transition-shadow dark:border-slate-800 ${isFull
+            ? "border-slate-300 dark:border-slate-700 dark:bg-slate-900"
             : "border-indigo-200 dark:border-indigo-900 dark:bg-slate-900 shadow-md dark:shadow-slate-900/50"
-        } ${
-          highlighted 
-            ? "ring-4 ring-indigo-500 dark:ring-indigo-400 ring-opacity-50 animate-pulse" 
+          } ${highlighted
+            ? "ring-4 ring-indigo-500 dark:ring-indigo-400 ring-opacity-50 animate-pulse"
             : ""
-        } transition-all duration-300`}
+          } transition-all duration-300`}
       >
         <CardHeader className="pb-1">
           <div className="flex items-start justify-between gap-2">
@@ -349,61 +347,61 @@ export function GroupCard({
               {[...group.members]
                 .sort((a, b) => a.localeCompare(b))
                 .map((member, index) => {
-                const isRepresentative = group.representative === member;
-                return (
-                  <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
-                      <span className="flex-1 min-w-0 truncate">{member}</span>
-                      {isRepresentative && (
+                  const isRepresentative = group.representative === member;
+                  return (
+                    <li key={index} className="text-slate-700 dark:text-slate-300 flex items-center justify-between gap-2 group">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 flex-shrink-0"></div>
+                        <span className="flex-1 min-w-0 truncate">{member}</span>
+                        {isRepresentative && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex">
+                                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-950 border-amber-200 dark:border-amber-900 flex-shrink-0">
+                                    <Crown className="w-3 h-3" />
+                                  </Badge>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Group Representative</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="inline-flex">
-                                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-950 border-amber-200 dark:border-amber-900 flex-shrink-0">
-                                  <Crown className="w-3 h-3" />
-                                </Badge>
-                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
+                                onClick={() => handleToggleRepresentative(member)}
+                              >
+                                <Crown className="w-3 h-3" />
+                              </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Group Representative</p>
+                              <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={`h-6 w-6 dark:hover:bg-slate-800 ${isRepresentative ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}
-                              onClick={() => handleToggleRepresentative(member)}
-                            >
-                              <Crown className="w-3 h-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{isRepresentative ? 'Remove Representative' : 'Make Representative'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      {(!isLocked || isAdmin) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 dark:hover:bg-slate-800"
-                          onClick={() => handleRemoveMember(member)}
-                        >
-                          <X className="w-3 h-3 text-red-600 dark:text-red-400" />
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
+                        {(!isLocked || isAdmin) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 dark:hover:bg-slate-800"
+                            onClick={() => handleRemoveMember(member)}
+                          >
+                            <X className="w-3 h-3 text-red-600 dark:text-red-400" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
           </div>
         </CardContent>
@@ -411,11 +409,10 @@ export function GroupCard({
           <Button
             onClick={() => setIsJoinDialogOpen(true)}
             variant="outline"
-            className={`w-full ${ 
-              isFull || isLocked
+            className={`w-full ${isFull || (isLocked && !isAdmin)
                 ? "border-slate-300 text-slate-400 cursor-not-allowed dark:border-slate-700 dark:text-slate-600"
-                : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-            }`}
+                : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
+              }`}
             disabled={isFull || (isLocked && !isAdmin)}
           >
             {isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Add Members" : "Join Group"}
@@ -431,7 +428,7 @@ export function GroupCard({
               {isAdmin ? "Add Members to Group" : "Join Group"}
             </DialogTitle>
             <DialogDescription className="dark:text-slate-400">
-              {isAdmin 
+              {isAdmin
                 ? "Add one or multiple members to the group. Enter one name per line."
                 : "Enter your name to join this group."}
             </DialogDescription>
@@ -477,7 +474,7 @@ export function GroupCard({
             }} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={isAdmin ? handleBatchAddMembers : handleJoinGroup}
               className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >

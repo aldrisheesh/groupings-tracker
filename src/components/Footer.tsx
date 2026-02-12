@@ -24,7 +24,7 @@ export function Footer() {
                         </svg>
                     </a>
                     <a
-                        href="https://messenger.com"
+                        href="https://m.me/j/AbYZwwWGGYNrlXYV/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { OrbitProgress } from "react-loading-indicators";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import { SubjectsPage } from "./components/SubjectsPage";
@@ -118,15 +119,46 @@ function App() {
 
   // Parse URL on mount and navigate if params exist
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const subjectId = params.get('subject');
-    const groupingId = params.get('grouping');
+    const parsePath = async () => {
+      const path = window.location.pathname;
 
-    if (subjectId && groupingId) {
-      setCurrentPage({ type: 'grouping', subjectId, groupingId });
-    } else if (subjectId) {
-      setCurrentPage({ type: 'subject', subjectId });
-    }
+      // Handle short URL redirect (e.g., /s/AbC12xyz)
+      if (path.startsWith('/s/')) {
+        const shortCode = path.substring(3); // Remove '/s/' prefix
+
+        // Dynamically import to avoid circular dependency
+        const { getFullUrl } = await import('./utils/shortener');
+        const result = await getFullUrl(shortCode);
+
+        if (result) {
+          setCurrentPage({ type: 'grouping', subjectId: result.subjectId, groupingId: result.groupingId });
+          // Update URL to use query params
+          const url = new URL(window.location.href);
+          url.pathname = '/';
+          url.searchParams.set('subject', result.subjectId);
+          url.searchParams.set('grouping', result.groupingId);
+          window.history.replaceState({}, '', url.toString());
+        } else {
+          toast.error('Invalid or expired share link');
+          setCurrentPage({ type: 'home' });
+          window.history.replaceState({}, '', '/');
+        }
+        return;
+      }
+
+      // Handle normal query parameter navigation
+      const params = new URLSearchParams(window.location.search);
+      const subjectId = params.get('subject');
+      const groupingId = params.get('grouping');
+
+      if (subjectId && groupingId) {
+        setCurrentPage({ type: 'grouping', subjectId, groupingId });
+      } else if (subjectId) {
+        setCurrentPage({ type: 'subject', subjectId });
+      }
+    };
+
+    parsePath();
   }, []);
 
   // Load all data on mount
@@ -749,7 +781,9 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <center>
+            <OrbitProgress dense color="#4f46e5" size="medium" text="" textColor="" />
+          </center>
           <p className="text-slate-600 dark:text-slate-400">
             Loading Groupings Tracker...
           </p>

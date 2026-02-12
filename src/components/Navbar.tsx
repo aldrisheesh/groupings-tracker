@@ -63,13 +63,27 @@ export function Navbar({
     }
   };
 
-  const handleShareClick = () => {
+  const handleShareClick = async () => {
     if (currentPage?.type === 'grouping' && currentPage.subjectId && currentPage.groupingId) {
-      const url = new URL(window.location.href);
-      url.search = ''; // Clear existing params
-      url.searchParams.set('subject', currentPage.subjectId);
-      url.searchParams.set('grouping', currentPage.groupingId);
-      setShareUrl(url.toString());
+      // Dynamically import to avoid circular dependency
+      const { createShortUrl } = await import('../utils/shortener');
+      const shortCode = await createShortUrl(currentPage.subjectId, currentPage.groupingId);
+
+      if (shortCode) {
+        const url = new URL(window.location.href);
+        url.pathname = `/s/${shortCode}`;
+        url.search = ''; // Clear query params
+        setShareUrl(url.toString());
+      } else {
+        // Fallback to full URL if short URL creation fails
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.searchParams.set('subject', currentPage.subjectId);
+        url.searchParams.set('grouping', currentPage.groupingId);
+        setShareUrl(url.toString());
+        toast.error('Could not generate short URL, using full link');
+      }
+
       setIsShareDialogOpen(true);
     }
   };

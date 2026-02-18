@@ -209,9 +209,8 @@ export function Navbar({
         </div>
       </nav>
 
-      {/* Admin Password Dialog */}
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-        <DialogContent className="w-[calc(100%-2rem)] mx-4 dark:bg-slate-900 dark:border-slate-800">
+        <DialogContent className="w-[calc(100%-2rem)] dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="dark:text-slate-100">Admin Authentication</DialogTitle>
             <DialogDescription className="dark:text-slate-400">

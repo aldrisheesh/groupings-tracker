@@ -28,26 +28,26 @@ const normalizeNameForMatching = (name: string): string => {
 const fuzzyMatch = (studentName: string, memberName: string): boolean => {
   const normalizedStudent = normalizeNameForMatching(studentName);
   const normalizedMember = normalizeNameForMatching(memberName);
-  
+
   // Split by comma to get last name and first name
   const studentParts = normalizedStudent.split(',').map(p => p.trim());
   const memberParts = normalizedMember.split(',').map(p => p.trim());
-  
+
   // Both must have last name and first name
   if (studentParts.length !== 2 || memberParts.length !== 2) {
     // Fallback to simple string matching
-    return normalizedStudent.startsWith(normalizedMember) || 
-           normalizedMember.startsWith(normalizedStudent);
+    return normalizedStudent.startsWith(normalizedMember) ||
+      normalizedMember.startsWith(normalizedStudent);
   }
-  
+
   const [studentLast, studentFirst] = studentParts;
   const [memberLast, memberFirst] = memberParts;
-  
+
   // Last names must match exactly
   if (studentLast !== memberLast) {
     return false;
   }
-  
+
   // First names: check if one contains the other (bidirectional)
   // This handles "Angelie" matching "Mary Angelie" and vice versa
   return studentFirst.includes(memberFirst) || memberFirst.includes(studentFirst);
@@ -78,7 +78,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   const availableStudents = filteredStudents
     .filter(student => !studentsInGroups.has(student.name))
     .sort((a, b) => a.name.localeCompare(b.name));
-  
+
   const unavailableStudents = filteredStudents
     .filter(student => studentsInGroups.has(student.name))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -105,7 +105,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
       </Button>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl w-[calc(100%-2rem)] dark:bg-slate-900 dark:border-slate-800">
+        <DialogContent className="max-w-2xl w-[calc(100%-2rem)] max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="dark:text-slate-50">Student Availability</DialogTitle>
             <DialogDescription className="dark:text-slate-400">
@@ -113,17 +113,19 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 flex flex-col min-h-0">
             {/* Search */}
-            <Input
-              placeholder="Search students..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
-            />
+            <div className="flex-shrink-0 px-0.5">
+              <Input
+                placeholder="Search students..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 flex-shrink-0">
               <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800">
                 <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                   <UserCheck className="w-5 h-5" />
@@ -141,7 +143,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
             </div>
 
             {/* Student Lists */}
-            <ScrollArea className="h-[400px] pr-4">
+            <ScrollArea className="h-[300px] sm:h-[400px] pr-4">
               <div className="space-y-6">
                 {/* Available Students */}
                 <div className="space-y-2">

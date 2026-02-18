@@ -8,7 +8,7 @@ import { GroupHistory } from "./GroupHistory";
 import { Button } from "./ui/button";
 import { toast } from "sonner@2.0.3";
 import { Badge } from "./ui/badge";
-import { exportGroupsToCSV } from "../utils/csvExport";
+import { exportGroupsToPDF } from "../utils/pdfExport";
 import * as db from "../utils/supabase/database";
 import { supabase } from "../utils/supabase/client";
 
@@ -45,25 +45,25 @@ const normalizeForMatching = (text: string): string => {
 const fuzzyMatchNames = (name1: string, name2: string): boolean => {
   const normalized1 = normalizeForMatching(name1);
   const normalized2 = normalizeForMatching(name2);
-  
+
   // Split by comma to get last name and first name
   const parts1 = normalized1.split(',').map(p => p.trim());
   const parts2 = normalized2.split(',').map(p => p.trim());
-  
+
   // Both must have last name and first name
   if (parts1.length !== 2 || parts2.length !== 2) {
     // Fallback to simple string matching
     return normalized1 === normalized2;
   }
-  
+
   const [last1, first1] = parts1;
   const [last2, first2] = parts2;
-  
+
   // Last names must match exactly
   if (last1 !== last2) {
     return false;
   }
-  
+
   // First names: check if one contains the other (bidirectional)
   // This handles "Roi" matching "Roi Aldrich" and vice versa
   return first1.includes(first2) || first2.includes(first1);
@@ -101,9 +101,9 @@ export function GroupingPage({
       .channel(`group-history-${grouping.id}`)
       .on(
         'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
+        {
+          event: 'INSERT',
+          schema: 'public',
           table: 'group_history',
           filter: `grouping_id=eq.${grouping.id}`
         },
@@ -150,7 +150,7 @@ export function GroupingPage({
         if (fuzzyMatchNames(memberName, existingMember)) {
           // Highlight the existing group
           setHighlightedGroupId(group.id);
-          
+
           // Show improved error toast with icon
           toast.error(
             `${memberName} is already in ${group.name} (as "${existingMember}")`,
@@ -216,7 +216,7 @@ export function GroupingPage({
 
           <div className="flex items-center gap-2 flex-wrap">
             {/* History Button for all users */}
-            <GroupHistory 
+            <GroupHistory
               groupingId={grouping.id}
               history={groupHistory}
               isAdmin={isAdmin}
@@ -231,14 +231,14 @@ export function GroupingPage({
                       toast.error("No groups to export");
                       return;
                     }
-                    exportGroupsToCSV(groups, subject.name, grouping.title);
-                    toast.success("Groups exported to CSV successfully!");
+                    exportGroupsToPDF(groups, subject.name, grouping.title);
+                    toast.success("Groups exported to PDF successfully!");
                   }}
                   variant="outline"
                   className="gap-2 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   <Download className="w-4 h-4" />
-                  Export CSV
+                  Export PDF
                 </Button>
 
                 <Button

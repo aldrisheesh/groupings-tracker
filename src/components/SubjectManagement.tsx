@@ -27,7 +27,7 @@ interface SubjectManagementProps {
 // Popular icon options from lucide-react
 const ICON_OPTIONS = [
   "calculator", "atom", "book-open", "laptop", "flask-conical", "pen-tool",
-  "beaker", "microscope", "globe", "brain", "palette", "music", 
+  "beaker", "microscope", "globe", "brain", "palette", "music",
   "dumbbell", "building-2", "scale", "landmark", "languages", "code",
   "cpu", "database", "git-branch", "terminal", "file-code", "graduation-cap",
   "library", "flask-round", "test-tube", "coins", "chart-line", "briefcase"
@@ -53,7 +53,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  
+
   const [name, setName] = useState("");
   const [selectedColor, setSelectedColor] = useState("bg-indigo-600");
   const [selectedIcon, setSelectedIcon] = useState("book-open");
@@ -139,11 +139,11 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
   };
 
   const renderIconPreview = (iconName: string) => {
-    const IconComponent = (Icons as any)[iconName.split('-').map((word, i) => 
-      i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : 
-      word.charAt(0).toUpperCase() + word.slice(1)
+    const IconComponent = (Icons as any)[iconName.split('-').map((word, i) =>
+      i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) :
+        word.charAt(0).toUpperCase() + word.slice(1)
     ).join('')];
-    
+
     if (!IconComponent) return null;
     return <IconComponent className="w-5 h-5" />;
   };
@@ -164,7 +164,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
           >
             Create New Subject
           </Button>
-          
+
           {subjects.length > 0 && (
             <div className="space-y-2">
               <p className="text-slate-600 dark:text-slate-400">Existing Subjects:</p>
@@ -175,7 +175,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                     className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 ${subject.color} rounded-lg flex items-center justify-center shadow-md`}>
+                      <div className={`w-10 h-10 shrink-0 ${subject.color} rounded-lg flex items-center justify-center shadow-md`}>
                         <span className="text-white">
                           {renderIconPreview(subject.icon)}
                         </span>
@@ -210,15 +210,15 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
 
       {/* Create Subject Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl w-[calc(100%-2rem)] mx-4 max-h-[90vh] overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
+        <DialogContent className="max-w-2xl w-[calc(100%-2rem)] mx-4 max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="dark:text-slate-100">Create New Subject</DialogTitle>
             <DialogDescription className="dark:text-slate-400">
               Add a new subject with a custom icon and color.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 overflow-y-auto flex-1 py-4">
-            <div className="space-y-2">
+          <div className="space-y-4 overflow-y-auto flex-1 py-4 px-1">
+            <div className="space-y-2 px-1">
               <Label htmlFor="subject-name">Subject Name</Label>
               <Input
                 id="subject-name"
@@ -228,23 +228,22 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 px-1">
               <Label>Color</Label>
               <div className="grid grid-cols-6 gap-2">
                 {COLOR_OPTIONS.map((color) => (
                   <button
                     key={color.class}
                     onClick={() => setSelectedColor(color.class)}
-                    className={`h-12 rounded-lg ${color.class} cursor-pointer ${
-                      selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
-                    }`}
+                    className={`h-12 rounded-lg ${color.class} cursor-pointer ${selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
+                      }`}
                     title={color.name}
                   />
                 ))}
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 px-1">
               <Label>Icon</Label>
               <div className="space-y-2">
                 <div className="relative">
@@ -262,11 +261,10 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                       <button
                         key={icon}
                         onClick={() => setSelectedIcon(icon)}
-                        className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${
-                          selectedIcon === icon
-                            ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
-                            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                        }`}
+                        className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${selectedIcon === icon
+                          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                          }`}
                         title={icon}
                       >
                         {renderIconPreview(icon)}
@@ -277,7 +275,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 px-1">
               <Label>Preview</Label>
               <div className={`w-full h-24 ${selectedColor} rounded-lg flex items-center justify-center gap-3`}>
                 <span className="text-white text-2xl">
@@ -303,22 +301,22 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
 
       {/* Edit Subject Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl w-[calc(100%-2rem)] mx-4 max-h-[90vh] overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
+        <DialogContent className="max-w-3xl w-[calc(100%-2rem)] mx-4 max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="dark:text-slate-100">Edit Subject - {selectedSubject?.name}</DialogTitle>
             <DialogDescription className="dark:text-slate-400">
               Update subject details and manage enrolled students.
             </DialogDescription>
           </DialogHeader>
-          
+
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="details">Subject Details</TabsTrigger>
               <TabsTrigger value="students">Enrolled Students</TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 py-4">
-              <div className="space-y-2">
+
+            <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 py-4 px-1">
+              <div className="space-y-2 px-1">
                 <Label htmlFor="edit-subject-name">Subject Name</Label>
                 <Input
                   id="edit-subject-name"
@@ -328,23 +326,22 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 px-1">
                 <Label>Color</Label>
                 <div className="grid grid-cols-6 gap-2">
                   {COLOR_OPTIONS.map((color) => (
                     <button
                       key={color.class}
                       onClick={() => setSelectedColor(color.class)}
-                      className={`h-12 rounded-lg ${color.class} cursor-pointer ${
-                        selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
-                      }`}
+                      className={`h-12 rounded-lg ${color.class} cursor-pointer ${selectedColor === color.class ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-slate-100" : ""
+                        }`}
                       title={color.name}
                     />
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 px-1">
                 <Label>Icon</Label>
                 <div className="space-y-2">
                   <div className="relative">
@@ -362,11 +359,10 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                         <button
                           key={icon}
                           onClick={() => setSelectedIcon(icon)}
-                          className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${
-                            selectedIcon === icon
-                              ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
-                              : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                          }`}
+                          className={`h-12 rounded-lg border-2 flex items-center justify-center cursor-pointer ${selectedIcon === icon
+                            ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950"
+                            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                            }`}
                           title={icon}
                         >
                           {renderIconPreview(icon)}
@@ -377,7 +373,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 px-1">
                 <Label>Preview</Label>
                 <div className={`w-full h-24 ${selectedColor} rounded-lg flex items-center justify-center gap-3`}>
                   <span className="text-white text-2xl">
@@ -387,7 +383,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
                 </div>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="students" className="flex-1 overflow-y-auto py-4">
               {selectedSubject && (
                 <StudentManagement
@@ -400,7 +396,7 @@ export function SubjectManagement({ subjects, onCreateSubject, onUpdateSubject, 
               )}
             </TabsContent>
           </Tabs>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setIsEditDialogOpen(false);

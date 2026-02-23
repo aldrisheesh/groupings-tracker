@@ -189,18 +189,20 @@ export function GroupingPage({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <Button
-          variant="ghost"
-          onClick={onBack}
-          className="flex items-center gap-2 -ml-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to {subject.name}
-        </Button>
+        <div className="max-w-[300px] sm:max-w-none overflow-hidden">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="flex items-center justify-start gap-2 -ml-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 w-full"
+          >
+            <ChevronLeft className="w-4 h-4 shrink-0" />
+            <span className="truncate">Back to {subject.name}</span>
+          </Button>
+        </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
-            <div className="flex items-center gap-3 text-slate-500 dark:text-slate-500 flex-wrap">
+            <div className="flex items-center gap-3 text-slate-500 dark:text-slate-500 flex-wrap mb-4">
               <span>{subject.name}</span>
               <span>—</span>
               <span>{grouping.title}</span>

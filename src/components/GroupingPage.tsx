@@ -17,7 +17,8 @@ interface GroupingPageProps {
   grouping: Grouping;
   groups: Group[];
   students: Student[];
-  onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => void;
+  onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => Promise<void> | void;
+  onCreateAutomaticGroups: (groupingId: string, numberOfGroups?: number, maxMembersPerGroup?: number) => Promise<void>;
   onJoinGroup: (groupId: string, memberName: string) => void;
   onBatchJoinGroup: (groupId: string, memberNames: string[]) => void;
   onUpdateGroup: (groupId: string, updatedGroup: Partial<Group>) => void;
@@ -75,6 +76,7 @@ export function GroupingPage({
   groups,
   students,
   onCreateGroup,
+  onCreateAutomaticGroups,
   onJoinGroup,
   onBatchJoinGroup,
   onUpdateGroup,
@@ -299,7 +301,9 @@ export function GroupingPage({
           <CreateGroupForm
             groupingId={grouping.id}
             groups={groups}
+            students={students}
             onCreateGroup={onCreateGroup}
+            onCreateAutomaticGroups={onCreateAutomaticGroups}
             onDeleteAllGroups={onDeleteAllGroups}
           />
         </div>

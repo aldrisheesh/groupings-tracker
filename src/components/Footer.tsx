@@ -61,7 +61,7 @@ export function Footer() {
                     </a>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 text-center font-medium">
-                    &copy; 2026 BSIT 3-2N Group Tracker. All rights reserved.
+                    &copy; 2026 BSIT 4-2N Group Tracker. All rights reserved.
                 </p>
             </div>
         </footer>

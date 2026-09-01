@@ -22,12 +22,14 @@ import {
 interface CreateGroupFormProps {
   groupingId: string;
   groups: Group[];
-  onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => void;
+  students: { id: string; name: string }[];
+  onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => Promise<void> | void;
+  onCreateAutomaticGroups: (groupingId: string, numberOfGroups?: number, maxMembersPerGroup?: number) => Promise<void>;
   onDeleteAllGroups: (groupingId: string) => void;
 }
 
-export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAllGroups }: CreateGroupFormProps) {
-  // Batch creation state
+export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, onCreateAutomaticGroups, onDeleteAllGroups }: CreateGroupFormProps) {
+  // Automatic creation state
   const [numberOfGroups, setNumberOfGroups] = useState("");
   const [batchMemberLimit, setBatchMemberLimit] = useState("");
 
@@ -36,90 +38,33 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
   const [singleMemberLimit, setSingleMemberLimit] = useState("");
 
   const handleCreateBatch = async () => {
-    if (!numberOfGroups.trim()) {
-      toast.error("Please enter the number of groups");
+    if (students.length === 0) {
+      toast.error("Add enrolled students before creating groups automatically");
       return;
     }
-
-    if (!batchMemberLimit.trim()) {
-      toast.error("Please enter a member limit");
+    const count = numberOfGroups.trim() ? parseInt(numberOfGroups, 10) : undefined;
+    const limit = batchMemberLimit.trim() ? parseInt(batchMemberLimit, 10) : undefined;
+    if (count === undefined && limit === undefined) {
+      toast.error("Enter a number of groups, a maximum member limit, or both");
       return;
     }
-
-    const count = parseInt(numberOfGroups);
-    if (isNaN(count) || count < 1) {
-      toast.error("Please enter a valid number of groups (at least 1)");
+    if (count !== undefined && (!Number.isInteger(count) || count < 1 || count > 50)) {
+      toast.error("Number of groups must be between 1 and 50");
       return;
     }
-
-    if (count > 50) {
-      toast.error("Maximum 50 groups can be created at once");
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+      toast.error("Maximum members per group must be at least 1");
       return;
     }
-
-    const limit = parseInt(batchMemberLimit);
-    if (isNaN(limit) || limit < 1) {
-      toast.error("Please enter a valid member limit (at least 1)");
+    if (count !== undefined && limit !== undefined && count * limit < students.length) {
+      toast.error(`These settings can hold only ${count * limit} students; increase the limit or number of groups`);
       return;
     }
-
-    // Dismiss any existing toasts
-    toast.dismiss();
-
-    // Show loading toast
-    const loadingToast = toast.loading(`Creating ${count} group${count > 1 ? 's' : ''}...`);
-
-    let successCount = 0;
-    
     try {
-      // Find the next available group number if we are following the "Group X" pattern
-      // accessible via existing groups check is a bit complex, so we'll just append
-      // actually, let's just stick to the requested simple logic for now
-      // or... let's try to be smart about naming if possible, but the requirement was "Group 1, Group 2..."
-      // If groups exist, we might want to continue numbering or just append.
-      // The original code reset to Group 1 if no groups. 
-      // Let's keep it simple: "Group X", "Group Y".
-      // If the user wants to append, they can see the existing groups.
-      // To avoid name collisions, we might want to check, but the DB likely handles duplicates or allows same names?
-      // The DB schema wasn't fully checked for unique constraint on name per grouping, but `createGroup` probably handles it.
-      
-      let nextIndex = 1;
-      // Simple heuristic: find max "Group N" and start from N+1
-      const groupNameRegex = /^Group (\d+)$/;
-      const existingIndices = groups
-        .map(g => {
-          const match = g.name.match(groupNameRegex);
-          return match ? parseInt(match[1]) : 0;
-        })
-        .filter(n => n > 0);
-      
-      if (existingIndices.length > 0) {
-        nextIndex = Math.max(...existingIndices) + 1;
-      }
-
-      for (let i = 0; i < count; i++) {
-        const currentIndex = nextIndex + i; // Start from the next available number
-        const groupName = `Group ${currentIndex}`;
-        
-        await onCreateGroup(groupingId, groupName, limit);
-        toast.dismiss(); // Dismiss individual success toast
-        successCount++;
-      }
-
-      toast.dismiss(loadingToast);
-      if (successCount === count) {
-        toast.success(`Successfully created ${count} group${count > 1 ? 's' : ''}!`);
-      } else if (successCount > 0) {
-        toast.warning(`Created ${successCount} out of ${count} groups`);
-      } else {
-        toast.error("Failed to create groups");
-      }
-      
+      await onCreateAutomaticGroups(groupingId, count, limit);
       setNumberOfGroups("");
-      // Keep member limit as it's likely to be reused
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      toast.error(`Failed to create groups. Created ${successCount} out of ${count}.`);
+    } catch {
+      // Parent handler reports persistence errors.
     }
   };
 
@@ -160,7 +105,7 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
             Add Groups
           </CardTitle>
           <CardDescription>
-            Create new groups for this grouping. You can add them one by one or in bulk.
+            Create a single group or automatically distribute enrolled students fairly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -172,7 +117,7 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
               </TabsTrigger>
               <TabsTrigger value="batch" className="flex items-center gap-2">
                 <Layers className="w-4 h-4" />
-                Batch Create
+                Automatic Groups
               </TabsTrigger>
             </TabsList>
             
@@ -210,13 +155,13 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
             <TabsContent value="batch" className="space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg text-sm text-slate-600 dark:text-slate-400 mb-4">
                 <p>
-                  This will create multiple groups named "Group X", "Group Y", etc. 
-                  {groups.length > 0 ? " numbering will continue from the highest existing group number." : " starting from Group 1."}
+                  Students are distributed as evenly as possible. Enter either value or both.
+                  {students.length > 0 ? ` ${students.length} enrolled student${students.length === 1 ? "" : "s"} available.` : " No enrolled students are available yet."}
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="number-of-groups">Number of Groups</Label>
+                  <Label htmlFor="number-of-groups">Number of Groups (optional)</Label>
                   <Input
                     id="number-of-groups"
                     type="number"
@@ -228,7 +173,7 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="batch-member-limit">Member Limit (per group)</Label>
+                  <Label htmlFor="batch-member-limit">Max Members per Group (optional)</Label>
                   <Input
                     id="batch-member-limit"
                     type="number"
@@ -241,9 +186,10 @@ export function CreateGroupForm({ groupingId, groups, onCreateGroup, onDeleteAll
               </div>
               <Button 
                 onClick={handleCreateBatch}
+                disabled={students.length === 0}
                 className="w-full md:w-auto"
               >
-                Batch Create Groups
+                Create and Assign Groups
               </Button>
             </TabsContent>
           </Tabs>

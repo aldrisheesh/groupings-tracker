@@ -121,7 +121,7 @@ export function Navbar({
               <div className="w-8 h-8 rounded-lg overflow-hidden shadow-lg shadow-indigo-500/20">
                 <img src="/favicon.svg" alt="Logo" className="w-full h-full object-cover" />
               </div>
-              <span className="text-slate-900 dark:text-slate-50">BSIT 3-2N Group Tracker</span>
+              <span className="text-slate-900 dark:text-slate-50">BSIT 4-2N Group Tracker</span>
             </button>
 
             {/* Desktop Navigation */}

@@ -169,7 +169,7 @@ Now that it's set up, let's learn by doing:
 #### Task 1: Toggle Admin Mode
 1. Look at top-right corner
 2. Click the "User Mode" button
-3. Enter password: `wer124SantosPogi`
+3. Enter the admin password configured by the site owner.
 4. Click "Authenticate"
 5. Notice button changes to "Admin Mode" and new features appear
 6. Click "Admin Mode" again to toggle back
@@ -427,9 +427,9 @@ For a school project, you won't hit limits.
 ### Q: Can multiple admins exist?
 **A:** Currently, anyone who knows the password can access admin mode.
 
-**Admin Password:** `wer124SantosPogi`
+**Admin Password:** Configured privately by the site owner.
 
-To change the password, edit `/components/Navbar.tsx` and update the `ADMIN_PASSWORD` constant.
+To change the password, update the server-side `ADMIN_PASSWORD` environment variable and redeploy the app. Never put this value in frontend source code.
 
 For production, you'd want to:
 1. Add user authentication

@@ -23,8 +23,6 @@ interface NavbarProps {
   groupingTitle?: string;
 }
 
-const ADMIN_PASSWORD = "wer124SantosPogi";
-
 export function Navbar({
   onNavigateHome,
   isAdmin,
@@ -39,6 +37,7 @@ export function Navbar({
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [password, setPassword] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
 
   const handleAdminToggle = () => {
@@ -52,14 +51,31 @@ export function Navbar({
     }
   };
 
-  const handlePasswordSubmit = () => {
-    if (password === ADMIN_PASSWORD) {
+  const handlePasswordSubmit = async () => {
+    if (!password || isAuthenticating) return;
+
+    setIsAuthenticating(true);
+    try {
+      const response = await fetch("/api/admin-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const result = await response.json().catch(() => ({ authenticated: false }));
+
+      if (!response.ok || !result.authenticated) {
+        toast.error(response.status === 503 ? "Admin authentication is not configured" : "Incorrect password");
+        return;
+      }
+
       onToggleAdmin(true);
       setIsPasswordDialogOpen(false);
       setPassword("");
       toast.success("Admin Mode Activated");
-    } else {
-      toast.error("Incorrect password");
+    } catch {
+      toast.error("Unable to verify the admin password");
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -228,7 +244,7 @@ export function Navbar({
                 placeholder="Enter admin password"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    handlePasswordSubmit();
+                    void handlePasswordSubmit();
                   }
                 }}
               />
@@ -244,8 +260,8 @@ export function Navbar({
             >
               Cancel
             </Button>
-            <Button onClick={handlePasswordSubmit} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-              Authenticate
+            <Button disabled={isAuthenticating || !password} onClick={() => void handlePasswordSubmit()} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
+              {isAuthenticating ? "Verifying..." : "Authenticate"}
             </Button>
           </DialogFooter>
         </DialogContent>

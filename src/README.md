@@ -113,6 +113,7 @@ A modern, clean, and minimal dashboard-style web app for managing student groups
    - Go to [vercel.com](https://vercel.com)
    - Click "Add New Project"
    - Import your GitHub repository
+   - Add a strong, unique `ADMIN_PASSWORD` under Project Settings → Environment Variables
    - Click "Deploy"
 
 3. **Verify deployment**
@@ -195,7 +196,7 @@ groupings-tracker/
 1. **Enable Admin Mode**
    - Click the "User Mode" button in top-right navbar
    - Enter admin password when prompted
-   - Default password: `wer124SantosPogi`
+   - The admin password is configured securely as the `ADMIN_PASSWORD` server environment variable.
 
 2. **Create a Subject**
    - Click "Add New Subject"
@@ -326,7 +327,7 @@ Common additions:
 - **Fix**: Check Supabase for `locked = true`
 
 ### Admin mode won't activate
-- **Check**: Using correct password (`wer124SantosPogi`)
+- **Check**: The `ADMIN_PASSWORD` environment variable is configured and the entered password is correct.
 - **Check**: No typos or extra spaces
 - **Fix**: Password is case-sensitive
 

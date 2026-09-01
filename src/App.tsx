@@ -601,25 +601,24 @@ function App() {
     requestedMaxMembers?: number,
   ) => {
     const groupingGroups = groups.filter((group) => group.groupingId === groupingId);
-    const groupingSubject = subjects.find((subject) =>
-      subject.students.some((student) => groupingGroups.some((group) => group.members.includes(student.name)))
-    );
-    // The grouping page supplies the subject's enrolled students through the current page.
     const subject = currentPage.type === "grouping"
       ? subjects.find((item) => item.id === currentPage.subjectId)
-      : groupingSubject;
+      : undefined;
     const enrolledStudents = subject?.students ?? [];
-    const assignedNames = new Set(groupingGroups.flatMap((group) => group.members.map((name) => name.trim().toLowerCase())));
-    const availableStudents = enrolledStudents.filter((student) => !assignedNames.has(student.name.trim().toLowerCase()));
 
-    if (availableStudents.length === 0) {
-      toast.error("No unassigned enrolled students are available for automatic grouping");
+    if (enrolledStudents.length === 0) {
+      toast.error("Add enrolled students before creating groups automatically");
       return;
     }
 
-    const groupCount = requestedCount ?? Math.ceil(availableStudents.length / (requestedMaxMembers as number));
-    const maxMembers = requestedMaxMembers ?? Math.ceil(availableStudents.length / groupCount);
-    if (groupCount < 1 || groupCount > 50 || groupCount * maxMembers < availableStudents.length) {
+    const groupCount = requestedCount ?? Math.ceil(enrolledStudents.length / (requestedMaxMembers as number));
+    const maxMembers = requestedMaxMembers ?? Math.ceil(enrolledStudents.length / groupCount);
+    if (
+      groupCount < 1 ||
+      groupCount > 50 ||
+      groupCount > enrolledStudents.length ||
+      groupCount * maxMembers < enrolledStudents.length
+    ) {
       toast.error("The selected grouping parameters cannot accommodate all enrolled students");
       return;
     }
@@ -628,21 +627,15 @@ function App() {
       const match = group.name.match(/^Group (\d+)$/);
       return match ? Math.max(max, Number(match[1])) : max;
     }, 0) + 1;
-    const baseSize = Math.floor(availableStudents.length / groupCount);
-    const remainder = availableStudents.length % groupCount;
+    const baseSize = Math.floor(enrolledStudents.length / groupCount);
+    const remainder = enrolledStudents.length % groupCount;
 
-    for (let index = 0, offset = 0; index < groupCount; index++) {
+    for (let index = 0; index < groupCount; index++) {
       const size = baseSize + (index < remainder ? 1 : 0);
-      const created = await db.createGroup(groupingId, `Group ${nextIndex + index}`, maxMembers);
+      const created = await db.createGroup(groupingId, `Group ${nextIndex + index}`, size);
       if (!created) throw new Error("Failed to create group");
-      for (const student of availableStudents.slice(offset, offset + size)) {
-        if (!(await db.addMemberToGroup(created.id, student.name))) {
-          throw new Error("Failed to assign student");
-        }
-      }
-      offset += size;
     }
-    toast.success(`Created ${groupCount} fair group${groupCount === 1 ? "" : "s"} for ${availableStudents.length} students`);
+    toast.success(`Created ${groupCount} empty group${groupCount === 1 ? "" : "s"} with fair member limits for ${enrolledStudents.length} students`);
   };
 
   const handleJoinGroup = async (

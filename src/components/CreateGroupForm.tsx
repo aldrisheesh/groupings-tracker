@@ -52,6 +52,10 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
       toast.error("Number of groups must be between 1 and 50");
       return;
     }
+    if (count !== undefined && count > students.length) {
+      toast.error(`Number of groups cannot exceed the ${students.length} enrolled students`);
+      return;
+    }
     if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
       toast.error("Maximum members per group must be at least 1");
       return;
@@ -105,7 +109,7 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
             Add Groups
           </CardTitle>
           <CardDescription>
-            Create a single group or automatically distribute enrolled students fairly.
+            Create a single group or automatically create empty groups with fair member limits.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -155,7 +159,7 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
             <TabsContent value="batch" className="space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg text-sm text-slate-600 dark:text-slate-400 mb-4">
                 <p>
-                  Students are distributed as evenly as possible. Enter either value or both.
+                  Creates blank groups with member limits distributed as evenly as possible. Enter either value or both.
                   {students.length > 0 ? ` ${students.length} enrolled student${students.length === 1 ? "" : "s"} available.` : " No enrolled students are available yet."}
                 </p>
               </div>
@@ -189,7 +193,7 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
                 disabled={students.length === 0}
                 className="w-full md:w-auto"
               >
-                Create and Assign Groups
+                Create Empty Groups
               </Button>
             </TabsContent>
           </Tabs>

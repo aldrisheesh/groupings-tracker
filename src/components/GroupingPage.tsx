@@ -11,10 +11,13 @@ import { Badge } from "./ui/badge";
 import { exportGroupsToPDF } from "../utils/pdfExport";
 import * as db from "../utils/supabase/database";
 import { supabase } from "../utils/supabase/client";
+import { GroupingDeadline } from './GroupingDeadline';
+import { exactStudentName } from '../utils/studentNames';
 
 interface GroupingPageProps {
   subject: Subject;
   grouping: Grouping;
+  onDeadlineSaved: (row: any) => void;
   groups: Group[];
   students: Student[];
   onCreateGroup: (groupingId: string, groupName: string, memberLimit: number) => Promise<void> | void;
@@ -73,6 +76,7 @@ const fuzzyMatchNames = (name1: string, name2: string): boolean => {
 export function GroupingPage({
   subject,
   grouping,
+  onDeadlineSaved,
   groups,
   students,
   onCreateGroup,
@@ -89,6 +93,18 @@ export function GroupingPage({
 }: GroupingPageProps) {
   const [highlightedGroupId, setHighlightedGroupId] = useState<string | null>(null);
   const [groupHistory, setGroupHistory] = useState<GroupHistoryType[]>([]);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!grouping.deadlineAt) return;
+    const tick = () => setNow(Date.now());
+    tick();
+    const interval = window.setInterval(tick, 15000);
+    const cutoff = Date.parse(grouping.deadlineAt) - Date.now();
+    const timeout = cutoff > 0 && cutoff < 2147483647 ? window.setTimeout(tick, cutoff) : undefined;
+    window.addEventListener('focus', tick);
+    return () => { clearInterval(interval); clearTimeout(timeout); window.removeEventListener('focus', tick); };
+  }, [grouping.deadlineAt]);
+  const deadlineExpired = !!grouping.deadlineAt && Date.parse(grouping.deadlineAt) <= now;
 
   useEffect(() => {
     const fetchGroupHistory = async () => {
@@ -146,10 +162,14 @@ export function GroupingPage({
   }, [groups, grouping.id]);
 
   const handleJoinGroup = (groupId: string, memberName: string) => {
+    if (grouping.deadlineAt && Date.parse(grouping.deadlineAt) <= Date.now()) {
+      toast.error('Registration is closed for this grouping');
+      return;
+    }
     // Check if member is already in ANY group using fuzzy matching
     for (const group of groups) {
       for (const existingMember of group.members) {
-        if (fuzzyMatchNames(memberName, existingMember)) {
+        if (grouping.deadlineAt ? exactStudentName(memberName) === exactStudentName(existingMember) : fuzzyMatchNames(memberName, existingMember)) {
           // Highlight the existing group
           setHighlightedGroupId(group.id);
 
@@ -181,10 +201,6 @@ export function GroupingPage({
     }
 
     // If not in any group, proceed with joining
-    const joinedGroup = groups.find(g => g.id === groupId);
-    if (joinedGroup) {
-      toast.success(`Successfully joined ${joinedGroup.name}! ${memberName} has been added to the group.`);
-    }
     onJoinGroup(groupId, memberName);
   };
 
@@ -215,7 +231,8 @@ export function GroupingPage({
                 </Badge>
               )}
             </div>
-            <StudentAvailability students={students} groups={groups} />
+            <StudentAvailability students={students} groups={groups} strictNames={!!grouping.deadlineAt} />
+            <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -287,7 +304,9 @@ export function GroupingPage({
                   onRemoveMember={onRemoveMember}
                   onDeleteGroup={onDeleteGroup}
                   isAdmin={isAdmin}
-                  isLocked={grouping.locked || false}
+                  isLocked={grouping.locked || deadlineExpired}
+                  registrationClosed={deadlineExpired}
+                  strictNames={!!grouping.deadlineAt}
                   highlighted={highlightedGroupId === group.id}
                 />
               </div>

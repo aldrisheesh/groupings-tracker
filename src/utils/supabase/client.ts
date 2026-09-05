@@ -26,6 +26,10 @@ export type DbGrouping = {
   subject_id: string;
   title: string;
   locked: boolean;
+  deadline_at: string | null;
+  deadline_processed_at: string | null;
+  deadline_unassigned_count: number | null;
+  deadline_error: string | null;
   created_at: string;
 };
 

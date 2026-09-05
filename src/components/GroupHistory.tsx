@@ -108,6 +108,7 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
 
           if (
             candidate.actionType === current.actionType && // Same action type (add or remove)
+            candidate.performedBy === current.performedBy &&
             candidate.groupName === current.groupName &&   // Same group
             Math.abs(currentTime - candidateTime) <= 5000  // Within 5 seconds
           ) {
@@ -281,6 +282,7 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
                             {getActionText(entry)}
                             <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 dark:text-slate-500">
                               <span>{formatTimeAgo(entry.createdAt)}</span>
+                              {entry.performedBy === 'system' && <span>· Automatically assigned</span>}
                             </div>
                           </div>
                         </div>

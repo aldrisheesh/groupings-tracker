@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { exactStudentName } from '../utils/studentNames';
 
 interface GroupCardProps {
   group: Group;
@@ -32,6 +33,8 @@ interface GroupCardProps {
   onDeleteGroup: (groupId: string) => void;
   isAdmin: boolean;
   isLocked: boolean;
+  registrationClosed?: boolean;
+  strictNames?: boolean;
   highlighted?: boolean;
 }
 
@@ -126,6 +129,8 @@ export function GroupCard({
   onDeleteGroup,
   isAdmin,
   isLocked,
+  registrationClosed = false,
+  strictNames = false,
   highlighted
 }: GroupCardProps) {
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
@@ -137,9 +142,19 @@ export function GroupCard({
   const [editMemberLimit, setEditMemberLimit] = useState(group.memberLimit.toString());
 
   const isFull = group.members.length >= group.memberLimit;
+  const memberKey = strictNames ? exactStudentName : normalizeForMatching;
+  const enrolled = (name: string) => strictNames
+    ? students.filter(s => exactStudentName(s.name) === exactStudentName(name)).length === 1
+    : fuzzyMatchStudent(name, students);
+  const membership = (name: string) => {
+    if (!strictNames) return isNameInAnyGroup(name, allGroups);
+    const existing = allGroups.find(g => g.members.some(m => exactStudentName(m) === exactStudentName(name)));
+    return { inGroup: !!existing, groupName: existing?.name, existingName: name };
+  };
 
   // Single member join (for regular users)
   const handleJoinGroup = () => {
+    if (registrationClosed) return;
     if (!memberName.trim()) {
       toast.error("Please enter your name");
       return;
@@ -150,12 +165,12 @@ export function GroupCard({
       return;
     }
 
-    if (!fuzzyMatchStudent(memberName, students)) {
-      toast.error("Name not found in enrolled students list");
+    if (!enrolled(memberName)) {
+      toast.error(strictNames ? 'Use your exact name from the enrolled student list' : 'Name not found in enrolled students list');
       return;
     }
 
-    if (group.members.some(m => normalizeForMatching(m) === normalizeForMatching(memberName.trim()))) {
+    if (group.members.some(m => memberKey(m) === memberKey(memberName.trim()))) {
       toast.error("You are already a member of this group");
       return;
     }
@@ -165,7 +180,7 @@ export function GroupCard({
       return;
     }
 
-    const nameCheck = isNameInAnyGroup(memberName, allGroups);
+    const nameCheck = membership(memberName);
     if (nameCheck.inGroup) {
       toast.error(`Name already in group "${nameCheck.groupName}": ${nameCheck.existingName}`);
       return;
@@ -178,6 +193,7 @@ export function GroupCard({
 
   // Batch add members (for admin)
   const handleBatchAddMembers = () => {
+    if (registrationClosed) return;
     if (!batchMemberNames.trim()) {
       toast.error("Please enter at least one name");
       return;
@@ -196,14 +212,14 @@ export function GroupCard({
     }
 
     // Check if names are in enrolled students list
-    const notEnrolled = names.filter(name => !fuzzyMatchStudent(name, students));
+    const notEnrolled = names.filter(name => !enrolled(name));
     if (notEnrolled.length > 0) {
       toast.error(`Name not found in enrolled students: ${notEnrolled[0]}`);
       return;
     }
 
     // Check for duplicates within input
-    const uniqueNames = new Set(names.map(normalizeForMatching));
+    const uniqueNames = new Set(names.map(memberKey));
     if (uniqueNames.size !== names.length) {
       toast.error("Duplicate names found in the list");
       return;
@@ -211,7 +227,7 @@ export function GroupCard({
 
     // Check if any names are already members
     const alreadyMembers = names.filter(name =>
-      group.members.some(m => normalizeForMatching(m) === normalizeForMatching(name))
+      group.members.some(m => memberKey(m) === memberKey(name))
     );
     if (alreadyMembers.length > 0) {
       toast.error(`Already a member: ${alreadyMembers[0]}`);
@@ -226,7 +242,7 @@ export function GroupCard({
 
     // Check if any names are already in any group
     for (const name of names) {
-      const nameCheck = isNameInAnyGroup(name, allGroups);
+      const nameCheck = membership(name);
       if (nameCheck.inGroup) {
         toast.error(`Name already in group "${nameCheck.groupName}": ${nameCheck.existingName}`);
         return;
@@ -238,7 +254,6 @@ export function GroupCard({
 
     setBatchMemberNames("");
     setIsJoinDialogOpen(false);
-    toast.success(`Successfully added ${names.length} member(s)`);
   };
 
   const handleRemoveMember = (memberName: string) => {
@@ -388,7 +403,7 @@ export function GroupCard({
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        {(!isLocked || isAdmin) && (
+                        {!registrationClosed && (!isLocked || isAdmin) && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -409,13 +424,13 @@ export function GroupCard({
           <Button
             onClick={() => setIsJoinDialogOpen(true)}
             variant="outline"
-            className={`w-full ${isFull || (isLocked && !isAdmin)
+            className={`w-full ${registrationClosed || isFull || (isLocked && !isAdmin)
                 ? "border-slate-300 text-slate-400 cursor-not-allowed dark:border-slate-700 dark:text-slate-600"
                 : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
               }`}
-            disabled={isFull || (isLocked && !isAdmin)}
+            disabled={registrationClosed || isFull || (isLocked && !isAdmin)}
           >
-            {isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Add Members" : "Join Group"}
+            {registrationClosed ? 'Registration closed' : isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Add Members" : "Join Group"}
           </Button>
         </CardFooter>
       </Card>
@@ -476,6 +491,7 @@ export function GroupCard({
             </Button>
             <Button
               onClick={isAdmin ? handleBatchAddMembers : handleJoinGroup}
+              disabled={registrationClosed}
               className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >
               {isAdmin ? "Add Members" : "Join"}

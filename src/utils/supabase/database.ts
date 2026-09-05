@@ -176,6 +176,15 @@ export async function removeStudentFromSubject(studentId: string): Promise<boole
 
 // ============ GROUPINGS ============
 
+export function deadlineFields(row: any) {
+  return {
+    deadlineAt: row.deadline_at ?? null,
+    deadlineProcessedAt: row.deadline_processed_at ?? null,
+    deadlineUnassignedCount: row.deadline_unassigned_count ?? null,
+    deadlineError: row.deadline_error ?? null,
+  };
+}
+
 export async function fetchGroupings(): Promise<Grouping[]> {
   const { data, error } = await supabase
     .from('groupings')
@@ -193,6 +202,7 @@ export async function fetchGroupings(): Promise<Grouping[]> {
     title: g.title,
     color: g.color || 'bg-indigo-500',
     locked: g.locked,
+    ...deadlineFields(g),
   }));
 }
 

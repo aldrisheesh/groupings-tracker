@@ -8,4 +8,5 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
-  
+
+  Optional registration deadlines require database and server configuration. See [deadline setup](src/DEADLINE_SETUP.md).

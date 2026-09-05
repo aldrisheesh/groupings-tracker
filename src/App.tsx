@@ -25,6 +25,10 @@ export type Grouping = {
   title: string;
   color: string;
   locked?: boolean;
+  deadlineAt?: string | null;
+  deadlineProcessedAt?: string | null;
+  deadlineUnassignedCount?: number | null;
+  deadlineError?: string | null;
 };
 
 export type Group = {
@@ -49,7 +53,7 @@ export type GroupHistory = {
   groupName: string;
   memberName?: string;
   details?: string;
-  performedBy: 'admin' | 'user';
+  performedBy: 'admin' | 'user' | 'system';
   createdAt: string;
 };
 
@@ -87,6 +91,30 @@ function App() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [groupings, setGroupings] = useState<Grouping[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const watchedDeadline = currentPage.type === 'grouping' ? groupings.find(g => g.id === currentPage.groupingId) : undefined;
+  useEffect(() => {
+    if (!watchedDeadline?.deadlineAt || watchedDeadline.deadlineProcessedAt) return;
+    let cancelled = false;
+    let refreshing = false;
+    const refresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const [{ data, error }, refreshedGroups] = await Promise.all([
+          supabase.from('groupings').select('*').eq('id', watchedDeadline.id).single(),
+          db.fetchGroups(),
+        ]);
+        if (!cancelled && data && !error) {
+          setGroupings(prev => prev.map(g => g.id === data.id ? { ...g, locked: data.locked, ...db.deadlineFields(data) } : g));
+          setGroups(refreshedGroups);
+        }
+      } catch (error) { console.error('Unable to refresh deadline status', error); }
+      finally { refreshing = false; }
+    };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener('focus', refresh); };
+  }, [watchedDeadline?.id, watchedDeadline?.deadlineAt, watchedDeadline?.deadlineProcessedAt]);
 
   // Helper function to update URL without reload
   const updateURL = (page: Page) => {
@@ -227,6 +255,7 @@ function App() {
               title: payload.new.title,
               color: payload.new.color,
               locked: payload.new.locked,
+              ...db.deadlineFields(payload.new),
             };
             setGroupings((prev) => {
               if (prev.some(g => g.id === newGrouping.id)) return prev;
@@ -241,6 +270,7 @@ function App() {
                     title: payload.new.title,
                     color: payload.new.color,
                     locked: payload.new.locked,
+                    ...db.deadlineFields(payload.new),
                   }
                   : g
               )
@@ -1081,6 +1111,7 @@ function App() {
               <GroupingPage
                 subject={subject}
                 grouping={grouping}
+                onDeadlineSaved={(updated) => setGroupings(prev => prev.map(g => g.id === grouping.id ? { ...g, ...db.deadlineFields(updated) } : g))}
                 groups={groupingGroups}
                 students={subject.students}
                 onCreateGroup={handleCreateGroup}

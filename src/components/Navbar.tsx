@@ -42,6 +42,7 @@ export function Navbar({
 
   const handleAdminToggle = () => {
     if (isAdmin) {
+      void fetch('/api/admin-auth', { method: 'DELETE' });
       // If already admin, just toggle off
       onToggleAdmin(false);
       toast.success("Switched to User Mode");

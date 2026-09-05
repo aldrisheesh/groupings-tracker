@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { exactStudentName } from '../utils/studentNames';
 import { UserCheck, UserX, Users as UsersIcon } from "lucide-react";
 import { Student, Group } from "../App";
 import { Button } from "./ui/button";
@@ -10,6 +11,7 @@ import { ScrollArea } from "./ui/scroll-area";
 interface StudentAvailabilityProps {
   students: Student[];
   groups: Group[];
+  strictNames?: boolean;
 }
 
 // Fuzzy matching: normalize name for comparison
@@ -53,7 +55,8 @@ const fuzzyMatch = (studentName: string, memberName: string): boolean => {
   return studentFirst.includes(memberFirst) || memberFirst.includes(studentFirst);
 };
 
-export function StudentAvailability({ students, groups }: StudentAvailabilityProps) {
+export function StudentAvailability({ students, groups, strictNames = false }: StudentAvailabilityProps) {
+  const matches = (a: string, b: string) => strictNames ? exactStudentName(a) === exactStudentName(b) : fuzzyMatch(a, b);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -62,7 +65,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   students.forEach(student => {
     groups.forEach(group => {
       group.members.forEach(member => {
-        if (fuzzyMatch(student.name, member)) {
+        if (matches(student.name, member)) {
           studentsInGroups.set(student.name, member);
         }
       });
@@ -86,7 +89,7 @@ export function StudentAvailability({ students, groups }: StudentAvailabilityPro
   // Find which group a student belongs to
   const findStudentGroup = (studentName: string): string | null => {
     for (const group of groups) {
-      if (group.members.some(member => fuzzyMatch(studentName, member))) {
+      if (group.members.some(member => matches(studentName, member))) {
         return group.name;
       }
     }

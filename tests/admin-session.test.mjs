@@ -1,0 +1,31 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { sessionCookie, isAdminRequest } from '../api/_lib/admin-session.js';
+import auth from '../api/admin-auth.js';
+import deadline from '../api/grouping-deadline.js';
+
+test('admin session verifies signed expiry and deadline API rejects unauthenticated writes', async () => {
+  process.env.ADMIN_PASSWORD = 'test-only-password';
+  const cookie = sessionCookie();
+  assert.ok(cookie.includes('HttpOnly; Secure; SameSite=Strict'));
+  assert.equal(isAdminRequest({ headers: { cookie } }), true);
+  assert.equal(isAdminRequest({ headers: {} }), false);
+  assert.equal(isAdminRequest({ headers: { cookie: cookie.replace(/\d/, '0') } }), false);
+  const response = () => ({ headers: {}, setHeader(key, value) { this.headers[key] = value; }, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } });
+  const rejected = response();
+  await deadline({ method: 'POST', headers: {}, body: {} }, rejected);
+  assert.equal(rejected.code, 401);
+  const valid = response();
+  auth({ method: 'POST', body: { password: process.env.ADMIN_PASSWORD } }, valid);
+  assert.equal(valid.code, 200);
+  assert.ok(valid.headers['Set-Cookie']);
+  const invalid = response();
+  auth({ method: 'POST', body: { password: 'wrong' } }, invalid);
+  assert.equal(invalid.code, 401);
+  assert.equal(invalid.headers['Set-Cookie'], undefined);
+  const logout = response();
+  auth({ method: 'DELETE' }, logout);
+  assert.ok(logout.headers['Set-Cookie'].includes('Max-Age=0'));
+  process.env.ADMIN_PASSWORD = 'changed-password';
+  assert.equal(isAdminRequest({ headers: { cookie } }), false);
+});

@@ -232,7 +232,7 @@ export function GroupingPage({
               )}
             </div>
             <StudentAvailability students={students} groups={groups} strictNames={!!grouping.deadlineAt} />
-            <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />
+            {!grouping.deadlineAt && <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -288,9 +288,10 @@ export function GroupingPage({
         </div>
       </div>
 
-      {groups.length > 0 && (
+      {(groups.length > 0 || grouping.deadlineAt) && (
         <div className="space-y-4">
           <h2 className="text-slate-700 dark:text-slate-300">Existing Groups</h2>
+          {grouping.deadlineAt && <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {groups.map((group) => (
               <div key={group.id} id={`group-${group.id}`}>

@@ -15,7 +15,7 @@ For local end-to-end testing, use a Vercel development server with these environ
 ## Behavior
 
 - No deadline: existing manual grouping behavior.
-- With a deadline: members must use an exact enrolled name (case and repeated whitespace are normalized). Enabling the deadline validates existing memberships and links them to student IDs. Ambiguous, abbreviated, unenrolled, or duplicate legacy memberships must be corrected first; the app never guesses their identities.
+- With a deadline: students can enter their surname and either complete given name (for example, `Santos, Roi` or `Santos, Aldrich` for `Santos, Roi Aldrich`). A shortened name must identify exactly one enrolled student; a full exact match takes priority. The form submits the full enrolled name, so database identity and duplicate checks stay consistent. This form enhancement needs no additional database migration. Enabling the deadline still validates existing memberships and links them to student IDs. Ambiguous, abbreviated, unenrolled, or duplicate legacy memberships must be corrected first; the app never guesses their identities.
 - At expiry: database time closes member additions/removals, including direct browser requests. Existing members stay in place. The job shuffles remaining enrolled students and fills smaller groups first, randomly breaking ties, without exceeding capacity.
 - Insufficient space: assign as many students as fit and display the number remaining. Add seats and set a new future deadline to run another assignment. Existing assignments are preserved.
 - Assignment errors: roll back that grouping's entire assignment, record a visible delayed status, and retry on the next minute. Inspect the database job logs for the detailed exception.

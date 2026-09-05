@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { exactStudentName } from '../utils/studentNames';
+import { exactStudentName, resolveStudentName } from '../utils/studentNames';
 
 interface GroupCardProps {
   group: Group;
@@ -142,13 +142,14 @@ export function GroupCard({
   const [editMemberLimit, setEditMemberLimit] = useState(group.memberLimit.toString());
 
   const isFull = group.members.length >= group.memberLimit;
-  const memberKey = strictNames ? exactStudentName : normalizeForMatching;
+  const canonicalName = (name: string) => strictNames ? resolveStudentName(name, students)?.name ?? name : name;
+  const memberKey = (name: string) => strictNames ? exactStudentName(canonicalName(name)) : normalizeForMatching(name);
   const enrolled = (name: string) => strictNames
-    ? students.filter(s => exactStudentName(s.name) === exactStudentName(name)).length === 1
+    ? !!resolveStudentName(name, students)
     : fuzzyMatchStudent(name, students);
   const membership = (name: string) => {
     if (!strictNames) return isNameInAnyGroup(name, allGroups);
-    const existing = allGroups.find(g => g.members.some(m => exactStudentName(m) === exactStudentName(name)));
+    const existing = allGroups.find(g => g.members.some(m => memberKey(m) === memberKey(name)));
     return { inGroup: !!existing, groupName: existing?.name, existingName: name };
   };
 
@@ -166,7 +167,7 @@ export function GroupCard({
     }
 
     if (!enrolled(memberName)) {
-      toast.error(strictNames ? 'Use your exact name from the enrolled student list' : 'Name not found in enrolled students list');
+      toast.error(strictNames ? 'Name not found or matches more than one student. Please enter your full enrolled name.' : 'Name not found in enrolled students list');
       return;
     }
 
@@ -186,7 +187,7 @@ export function GroupCard({
       return;
     }
 
-    onJoinGroup(group.id, memberName.trim());
+    onJoinGroup(group.id, canonicalName(memberName.trim()));
     setMemberName("");
     setIsJoinDialogOpen(false);
   };
@@ -201,7 +202,7 @@ export function GroupCard({
 
     const names = batchMemberNames
       .split('\n')
-      .map(name => name.trim())
+      .map(name => canonicalName(name.trim()))
       .filter(name => name.length > 0);
 
     // Validate all names first

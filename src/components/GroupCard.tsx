@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Edit2, Trash2, X, Crown, UsersRound } from "lucide-react";
+import { Users, Edit2, Trash2, X, Crown, UsersRound, GripVertical } from "lucide-react";
 import { Group, Student } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -36,6 +36,7 @@ interface GroupCardProps {
   registrationClosed?: boolean;
   strictNames?: boolean;
   highlighted?: boolean;
+  reorderable?: boolean;
 }
 
 // Helper function to validate name format: Last Name, First Name
@@ -131,12 +132,14 @@ export function GroupCard({
   isLocked,
   registrationClosed = false,
   strictNames = false,
-  highlighted
+  highlighted,
+  reorderable = false,
 }: GroupCardProps) {
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [memberName, setMemberName] = useState("");
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [batchMemberNames, setBatchMemberNames] = useState("");
   const [editGroupName, setEditGroupName] = useState(group.name);
   const [editMemberLimit, setEditMemberLimit] = useState(group.memberLimit.toString());
@@ -152,10 +155,16 @@ export function GroupCard({
     const existing = allGroups.find(g => g.members.some(m => memberKey(m) === memberKey(name)));
     return { inGroup: !!existing, groupName: existing?.name, existingName: name };
   };
+  const nameSuggestions = memberName.trim().length > 0
+    ? students
+      .filter((student) => !membership(student.name).inGroup)
+      .filter((student) => normalizeForMatching(student.name).includes(normalizeForMatching(memberName)))
+      .slice(0, 6)
+    : [];
 
   // Single member join (for regular users)
   const handleJoinGroup = () => {
-    if (registrationClosed) return;
+    if (registrationClosed && !isAdmin) return;
     if (!memberName.trim()) {
       toast.error("Please enter your name");
       return;
@@ -194,7 +203,7 @@ export function GroupCard({
 
   // Batch add members (for admin)
   const handleBatchAddMembers = () => {
-    if (registrationClosed) return;
+    if (registrationClosed && !isAdmin) return;
     if (!batchMemberNames.trim()) {
       toast.error("Please enter at least one name");
       return;
@@ -321,6 +330,7 @@ export function GroupCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="flex items-center gap-2 dark:text-slate-100">
+                {reorderable && <span className="group-drag-handle" title="Drag to reorder groups" aria-label="Drag to reorder groups"><GripVertical className="w-4 h-4" /></span>}
                 <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 {group.name}
               </CardTitle>
@@ -404,7 +414,7 @@ export function GroupCard({
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        {!registrationClosed && (!isLocked || isAdmin) && (
+                        {(!registrationClosed || isAdmin) && (!isLocked || isAdmin) && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -425,13 +435,13 @@ export function GroupCard({
           <Button
             onClick={() => setIsJoinDialogOpen(true)}
             variant="outline"
-            className={`w-full ${registrationClosed || isFull || (isLocked && !isAdmin)
+            className={`w-full ${(!isAdmin && registrationClosed) || isFull || (isLocked && !isAdmin)
                 ? "border-slate-300 text-slate-400 cursor-not-allowed dark:border-slate-700 dark:text-slate-600"
                 : "border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
               }`}
-            disabled={registrationClosed || isFull || (isLocked && !isAdmin)}
+            disabled={(!isAdmin && registrationClosed) || isFull || (isLocked && !isAdmin)}
           >
-            {registrationClosed ? 'Registration closed' : isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Add Members" : "Join Group"}
+            {registrationClosed && !isAdmin ? 'Class list finalized' : isLocked && !isAdmin ? "Locked" : isFull ? "Group Full" : isAdmin ? "Manage members" : "Join Group"}
           </Button>
         </CardFooter>
       </Card>
@@ -469,16 +479,28 @@ export function GroupCard({
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="memberName" className="dark:text-slate-200">Your Name</Label>
-                <Input
-                  id="memberName"
-                  value={memberName}
-                  onChange={(e) => setMemberName(e.target.value)}
-                  placeholder="Santos, Roi Aldrich"
-                  className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Format: Last Name, First Name
-                </p>
+                <div className="relative">
+                  <Input
+                    id="memberName"
+                    value={memberName}
+                    onChange={(e) => { setMemberName(e.target.value); setShowNameSuggestions(true); }}
+                    onFocus={() => setShowNameSuggestions(true)}
+                    onBlur={() => window.setTimeout(() => setShowNameSuggestions(false), 120)}
+                    placeholder="Start typing your name"
+                    autoComplete="off"
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  />
+                  {showNameSuggestions && nameSuggestions.length > 0 && (
+                    <div role="listbox" aria-label="Matching enrolled students" className="absolute z-50 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900">
+                      {nameSuggestions.map((student) => (
+                        <button key={student.id} type="button" role="option" onMouseDown={() => { setMemberName(student.name); setShowNameSuggestions(false); }} className="flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-indigo-50 hover:text-indigo-800 focus:bg-indigo-50 focus:outline-none dark:text-slate-200 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-200">
+                          {student.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Choose your name from the enrolled-student list.</p>
               </div>
             )}
           </div>

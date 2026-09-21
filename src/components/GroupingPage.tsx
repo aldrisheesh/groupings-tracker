@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, Lock, Unlock, Download } from "lucide-react";
+import { ChevronLeft, Lock, Unlock, Download, Undo2, UsersRound } from "lucide-react";
 import { Subject, Grouping, Group, Student, GroupHistory as GroupHistoryType } from "../App";
 import { GroupCard } from "./GroupCard";
 import { CreateGroupForm } from "./CreateGroupForm";
@@ -28,6 +28,7 @@ interface GroupingPageProps {
   onRemoveMember: (groupId: string, memberName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onDeleteAllGroups: (groupingId: string) => void;
+  onReorderGroups: (groupingId: string, orderedIds: string[]) => Promise<void>;
   onBack: () => void;
   isAdmin: boolean;
   onToggleGroupingLock: (groupingId: string) => void;
@@ -87,6 +88,7 @@ export function GroupingPage({
   onRemoveMember,
   onDeleteGroup,
   onDeleteAllGroups,
+  onReorderGroups,
   onBack,
   isAdmin,
   onToggleGroupingLock,
@@ -94,6 +96,50 @@ export function GroupingPage({
   const [highlightedGroupId, setHighlightedGroupId] = useState<string | null>(null);
   const [groupHistory, setGroupHistory] = useState<GroupHistoryType[]>([]);
   const [now, setNow] = useState(Date.now());
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const [groupOrder, setGroupOrder] = useState<string[]>([]);
+  const [undoOrder, setUndoOrder] = useState<string[] | null>(null);
+  const [activeViewerCount, setActiveViewerCount] = useState(1);
+  const numericGroups = [...groups].sort((a, b) => {
+    const aNumber = Number(a.name.match(/^Group (\d+)$/)?.[1]) || Number.MAX_SAFE_INTEGER;
+    const bNumber = Number(b.name.match(/^Group (\d+)$/)?.[1]) || Number.MAX_SAFE_INTEGER;
+    return aNumber - bNumber || a.name.localeCompare(b.name);
+  });
+  const displayGroups = groupOrder.length === groups.length
+    ? groupOrder.map((id) => groups.find((group) => group.id === id)).filter((group): group is Group => Boolean(group))
+    : numericGroups;
+
+  useEffect(() => {
+    setGroupOrder((previous) => previous.length === groups.length && previous.every((id) => groups.some((group) => group.id === id))
+      ? previous
+      : numericGroups.map((group) => group.id));
+  }, [groups]);
+
+  const moveGroup = async (targetId: string) => {
+    if (!draggedGroupId || draggedGroupId === targetId) return;
+    const previous = displayGroups.map((group) => group.id);
+    const next = [...previous];
+    const from = next.indexOf(draggedGroupId);
+    const to = next.indexOf(targetId);
+    next.splice(from, 1);
+    next.splice(to, 0, draggedGroupId);
+    setGroupOrder(next);
+    setUndoOrder(previous);
+    setDraggedGroupId(null);
+    setDragOverGroupId(null);
+    await onReorderGroups(grouping.id, next);
+    toast.success('Groups reordered and renumbered');
+  };
+
+  const undoReorder = async () => {
+    if (!undoOrder) return;
+    const current = displayGroups.map((group) => group.id);
+    setGroupOrder(undoOrder);
+    setUndoOrder(current);
+    await onReorderGroups(grouping.id, undoOrder);
+    toast.success('Group order restored');
+  };
   useEffect(() => {
     if (!grouping.deadlineAt) return;
     const tick = () => setNow(Date.now());
@@ -160,6 +206,27 @@ export function GroupingPage({
     };
     refetchHistory();
   }, [groups, grouping.id]);
+
+  useEffect(() => {
+    const presenceChannel = supabase.channel(`grouping-presence-${grouping.id}`, {
+      config: { presence: { key: crypto.randomUUID() } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        setActiveViewerCount(Object.keys(presenceChannel.presenceState()).length);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void presenceChannel.track({ viewing: grouping.id, joinedAt: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      void presenceChannel.untrack();
+      void supabase.removeChannel(presenceChannel);
+    };
+  }, [grouping.id]);
 
   const handleJoinGroup = (groupId: string, memberName: string) => {
     if (grouping.deadlineAt && Date.parse(grouping.deadlineAt) <= Date.now()) {
@@ -236,6 +303,11 @@ export function GroupingPage({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" title="Active viewers in this grouping">
+              <UsersRound className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="tabular-nums">{activeViewerCount}</span>
+              <span className="hidden sm:inline">active now</span>
+            </div>
             {/* History Button for all users */}
             <GroupHistory
               groupingId={grouping.id}
@@ -290,11 +362,21 @@ export function GroupingPage({
 
       {(groups.length > 0 || grouping.deadlineAt) && (
         <div className="space-y-4">
-          <h2 className="text-slate-700 dark:text-slate-300">Existing Groups</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-slate-700 dark:text-slate-300">Existing Groups</h2>
+            </div>
+            {isAdmin && undoOrder && <Button variant="outline" size="sm" onClick={() => void undoReorder()} className="gap-2"><Undo2 className="h-4 w-4" />Undo reorder</Button>}
+          </div>
           {grouping.deadlineAt && <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groups.map((group) => (
-              <div key={group.id} id={`group-${group.id}`}>
+            {displayGroups.map((group) => (
+              <div key={group.id} id={`group-${group.id}`} draggable={isAdmin}
+                onDragStart={() => setDraggedGroupId(group.id)}
+                onDragEnd={() => { setDraggedGroupId(null); setDragOverGroupId(null); }}
+                onDragOver={(event) => { if (isAdmin) { event.preventDefault(); setDragOverGroupId(group.id); } }}
+                onDrop={() => void moveGroup(group.id)}
+                className={isAdmin ? `group relative cursor-grab active:cursor-grabbing group-reorder-item ${draggedGroupId === group.id ? 'is-dragging' : ''} ${dragOverGroupId === group.id && draggedGroupId !== group.id ? 'is-drop-target' : ''}` : ''}>
                 <GroupCard
                   group={group}
                   students={students}
@@ -309,6 +391,7 @@ export function GroupingPage({
                   registrationClosed={deadlineExpired}
                   strictNames={!!grouping.deadlineAt}
                   highlighted={highlightedGroupId === group.id}
+                  reorderable={isAdmin}
                 />
               </div>
             ))}

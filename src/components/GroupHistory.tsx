@@ -265,10 +265,7 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
               ) : (
                 <div className="space-y-3">
                   {processedHistory.map((entry) => (
-                    <Card
-                      key={entry.id}
-                      className="border-l-4 border-l-slate-300 dark:border-l-slate-700 dark:bg-slate-800 dark:border-slate-700 hover:shadow-md transition-shadow"
-                    >
+                    <Card key={entry.id} className="history-entry rounded-xl border border-slate-200/80 bg-slate-50/70 shadow-none dark:border-slate-700 dark:bg-slate-800">
                       <CardContent className="p-3 sm:p-4">
                         <div className="flex items-start gap-2 sm:gap-3">
                           <div

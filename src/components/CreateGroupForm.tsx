@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PlusCircle, Trash2, Users, Layers } from "lucide-react";
+import { PlusCircle, Trash2, Users, Layers, Hash } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -33,8 +33,6 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
   const [numberOfGroups, setNumberOfGroups] = useState("");
   const [batchMemberLimit, setBatchMemberLimit] = useState("");
 
-  // Single creation state
-  const [singleGroupName, setSingleGroupName] = useState("");
   const [singleMemberLimit, setSingleMemberLimit] = useState("");
 
   const handleCreateBatch = async () => {
@@ -73,11 +71,6 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
   };
 
   const handleCreateSingle = async () => {
-    if (!singleGroupName.trim()) {
-      toast.error("Please enter a group name");
-      return;
-    }
-
     if (!singleMemberLimit.trim()) {
       toast.error("Please enter a member limit");
       return;
@@ -89,14 +82,7 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
       return;
     }
 
-    // Check for duplicate name locally to give fast feedback
-    if (groups.some(g => g.name.toLowerCase() === singleGroupName.trim().toLowerCase())) {
-      toast.error("A group with this name already exists");
-      return;
-    }
-
-    await onCreateGroup(groupingId, singleGroupName.trim(), limit);
-    setSingleGroupName("");
+    await onCreateGroup(groupingId, "", limit);
     // Keep member limit as it's likely to be reused
   };
 
@@ -126,17 +112,18 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
             </TabsList>
             
             <TabsContent value="single" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="single-group-name">Group Name</Label>
-                  <Input
-                    id="single-group-name"
-                    value={singleGroupName}
-                    onChange={(e) => setSingleGroupName(e.target.value)}
-                    placeholder="e.g., Alpha Team"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end">
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 dark:border-indigo-900/60 dark:bg-indigo-950/25">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">Next group</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Created automatically in sequence.</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 text-indigo-700 shadow-sm dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300">
+                    <Hash className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Group {groups.reduce((highest, group) => Math.max(highest, Number(group.name.match(/^Group (\d+)$/)?.[1]) || 0), 0) + 1}</span>
+                  </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:w-56">
                   <Label htmlFor="single-member-limit">Member Limit</Label>
                   <Input
                     id="single-member-limit"
@@ -152,7 +139,7 @@ export function CreateGroupForm({ groupingId, groups, students, onCreateGroup, o
                 onClick={handleCreateSingle}
                 className="w-full md:w-auto"
               >
-                Add Group
+                Create next group
               </Button>
             </TabsContent>
             

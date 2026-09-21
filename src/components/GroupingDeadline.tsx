@@ -75,7 +75,7 @@ export function GroupingDeadline({ grouping, isAdmin, now, onSaved }: {
             <div className="space-y-1">
               <p className="registration-deadline-title flex flex-wrap items-baseline">
                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {completed ? 'Registration closed' : expired ? 'Registration closed · Assignment pending' : `Registration closes in ${deadlineRemaining(grouping.deadlineAt, now)}`}
+                  {completed ? 'Class list finalized' : expired ? 'Class list finalizing · Assignment pending' : `Choice window closes in ${deadlineRemaining(grouping.deadlineAt, now)}`}
                 </span>
                 {!expired && <span className="text-xs">{exactDate}</span>}
               </p>

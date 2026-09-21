@@ -598,9 +598,13 @@ function App() {
   // Group handlers
   const handleCreateGroup = async (
     groupingId: string,
-    groupName: string,
+    _groupName: string,
     memberLimit: number,
   ) => {
+    const nextNumber = groups
+      .filter((group) => group.groupingId === groupingId)
+      .reduce((highest, group) => Math.max(highest, Number(group.name.match(/^Group (\d+)$/)?.[1]) || 0), 0) + 1;
+    const groupName = `Group ${nextNumber}`;
     const newGroup = await db.createGroup(
       groupingId,
       groupName,
@@ -615,6 +619,25 @@ function App() {
     } else {
       toast.error("Failed to create group");
     }
+  };
+
+  const handleReorderGroups = async (groupingId: string, orderedIds: string[]) => {
+    const ordered = orderedIds
+      .map((id) => groups.find((group) => group.id === id))
+      .filter((group): group is Group => Boolean(group));
+    if (ordered.length !== orderedIds.length) return;
+
+    const results = await Promise.all(ordered.map((group, index) =>
+      db.updateGroup(group.id, { name: `Group ${index + 1}` }),
+    ));
+    if (results.some((success) => !success)) {
+      toast.error('We could not save the new group order');
+      return;
+    }
+    setGroups((previous) => previous.map((group) => {
+      const index = orderedIds.indexOf(group.id);
+      return group.groupingId === groupingId && index >= 0 ? { ...group, name: `Group ${index + 1}` } : group;
+    }));
   };
 
   const handleCreateAutomaticGroups = async (
@@ -1122,6 +1145,7 @@ function App() {
                 onRemoveMember={handleRemoveMember}
                 onDeleteGroup={handleDeleteGroup}
                 onDeleteAllGroups={handleDeleteAllGroups}
+                onReorderGroups={handleReorderGroups}
                 onBack={() =>
                   navigateToPage({
                     type: "subject",

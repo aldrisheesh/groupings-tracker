@@ -41,6 +41,18 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+.history-entry { border-left: 3px solid #c7d2fe; }
+.group-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  color: #94a3b8;
+  cursor: grab;
+  transition: color .15s ease, transform .15s ease;
+}
+.group-reorder-item:hover .group-drag-handle { color: #4f46e5; }
+.group-reorder-item.is-dragging { opacity: .42; transform: scale(.975); }
+.group-reorder-item.is-drop-target > div { box-shadow: 0 0 0 2px #818cf8, 0 12px 24px rgba(79, 70, 229, .12); }
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

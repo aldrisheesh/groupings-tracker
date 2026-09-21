@@ -57,5 +57,16 @@
     server: {
       port: 3000,
       open: true,
+      // `vercel dev` runs the serverless functions separately. Set
+      // VERCEL_DEV_API_URL (for example http://localhost:3003) to make the
+      // normal Vite UI use those local API functions during development.
+      proxy: process.env.VERCEL_DEV_API_URL
+        ? {
+            '/api': {
+              target: process.env.VERCEL_DEV_API_URL,
+              changeOrigin: true,
+            },
+          }
+        : undefined,
     },
   });

@@ -324,6 +324,7 @@ export async function fetchGroups(): Promise<Group[]> {
       .map(member => member.member_name),
     memberLimit: group.member_limit,
     representative: group.representative || undefined,
+    details: group.details ?? null,
   }));
 }
 
@@ -334,6 +335,7 @@ export async function createGroup(groupingId: string, name: string, memberLimit:
     name,
     member_limit: memberLimit,
     representative: null,
+    details: null,
   };
 
   const { data, error } = await supabase
@@ -354,6 +356,7 @@ export async function createGroup(groupingId: string, name: string, memberLimit:
     members: [],
     memberLimit: data.member_limit,
     representative: data.representative || undefined,
+    details: data.details ?? null,
   };
 }
 
@@ -363,6 +366,7 @@ export async function updateGroup(id: string, updates: Partial<Group>): Promise<
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.memberLimit !== undefined) dbUpdates.member_limit = updates.memberLimit;
   if (updates.representative !== undefined) dbUpdates.representative = updates.representative;
+  if (updates.details !== undefined) dbUpdates.details = updates.details;
 
   // Handle member updates separately
   if (updates.members !== undefined) {

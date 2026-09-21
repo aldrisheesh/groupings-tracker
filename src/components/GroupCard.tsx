@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Edit2, Trash2, X, Crown, UsersRound, GripVertical } from "lucide-react";
+import { Users, Edit2, Trash2, X, Crown, UsersRound, GripVertical, Info } from "lucide-react";
 import { Group, Student } from "../App";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -138,11 +138,14 @@ export function GroupCard({
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [memberName, setMemberName] = useState("");
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [batchMemberNames, setBatchMemberNames] = useState("");
   const [editGroupName, setEditGroupName] = useState(group.name);
   const [editMemberLimit, setEditMemberLimit] = useState(group.memberLimit.toString());
+  const [editDetails, setEditDetails] = useState(group.details || "");
+  const [detailsDraft, setDetailsDraft] = useState(group.details || "");
 
   const isFull = group.members.length >= group.memberLimit;
   const canonicalName = (name: string) => strictNames ? resolveStudentName(name, students)?.name ?? name : name;
@@ -302,6 +305,7 @@ export function GroupCard({
     onUpdateGroup(group.id, {
       name: editGroupName.trim(),
       memberLimit: newLimit,
+      details: editDetails.trim() || null,
     });
 
     setIsEditDialogOpen(false);
@@ -312,6 +316,17 @@ export function GroupCard({
     onDeleteGroup(group.id);
     setIsDeleteDialogOpen(false);
     toast.success("Group deleted successfully");
+  };
+
+  const openDetails = () => {
+    setDetailsDraft(group.details || "");
+    setIsDetailsDialogOpen(true);
+  };
+
+  const saveDetails = () => {
+    onUpdateGroup(group.id, { details: detailsDraft.trim() || null });
+    setIsDetailsDialogOpen(false);
+    toast.success(detailsDraft.trim() ? 'Group details saved' : 'Group details cleared');
   };
 
   return (
@@ -338,8 +353,19 @@ export function GroupCard({
                 {isFull ? "Full" : "Available"}
               </Badge>
             </div>
-            {isAdmin && (
-              <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 dark:hover:bg-slate-800" onClick={openDetails}>
+                      <Info className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{group.details ? 'View or update group details' : 'Add group details'}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {isAdmin && (
+                <>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -347,6 +373,7 @@ export function GroupCard({
                   onClick={() => {
                     setEditGroupName(group.name);
                     setEditMemberLimit(group.memberLimit.toString());
+                    setEditDetails(group.details || "");
                     setIsEditDialogOpen(true);
                   }}
                 >
@@ -360,12 +387,19 @@ export function GroupCard({
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 pt-0">
           <div className="space-y-2">
+            {group.details && (
+              <div className="mb-4 border-l-2 border-indigo-200 pl-3 text-sm dark:border-indigo-800">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Group details</p>
+                <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-300">{group.details}</p>
+              </div>
+            )}
             <p className="text-slate-600 dark:text-slate-400">
               Members ({group.members.length}/{group.memberLimit}):
             </p>
@@ -445,6 +479,24 @@ export function GroupCard({
           </Button>
         </CardFooter>
       </Card>
+
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="dark:bg-slate-900 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-slate-100">Group details</DialogTitle>
+            <DialogDescription className="dark:text-slate-400">Add a short shared detail for this group, such as a task, plan, or topic.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor={`group-details-${group.id}`} className="dark:text-slate-200">Topic or details</Label>
+            <Textarea id={`group-details-${group.id}`} value={detailsDraft} onChange={(event) => setDetailsDraft(event.target.value.slice(0, 180))} placeholder="e.g., Presentation topic" className="min-h-28 resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" />
+            <p className="text-xs text-slate-500 dark:text-slate-400">Visible to the entire section.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+            <Button onClick={saveDetails} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600">Save details</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Join Group / Add Members Dialog */}
       <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
@@ -542,6 +594,17 @@ export function GroupCard({
                 placeholder="Group 1"
                 className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editGroupDetails" className="dark:text-slate-200">Group details <span className="font-normal text-slate-400">(optional)</span></Label>
+              <Textarea
+                id="editGroupDetails"
+                value={editDetails}
+                onChange={(e) => setEditDetails(e.target.value.slice(0, 180))}
+                placeholder="e.g., Presentation topic, assigned section, or shared task"
+                className="min-h-20 resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">A short optional note visible to the entire section.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="editMemberLimit" className="dark:text-slate-200">Member Limit</Label>

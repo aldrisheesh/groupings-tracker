@@ -38,6 +38,7 @@ export type Group = {
   members: string[];
   memberLimit: number;
   representative?: string;
+  details?: string | null;
 };
 
 export type Student = {
@@ -300,6 +301,7 @@ function App() {
               members: [],
               memberLimit: payload.new.member_limit,
               representative: payload.new.representative || undefined,
+              details: payload.new.details ?? null,
             };
             setGroups((prev) => {
               const exists = prev.some(g => g.id === newGroup.id);
@@ -319,6 +321,7 @@ function App() {
                     name: payload.new.name,
                     memberLimit: payload.new.member_limit,
                     representative: payload.new.representative || undefined,
+                    details: payload.new.details ?? null,
                   }
                   : g
               )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarClock, Check, Clock3, Loader2 } from 'lucide-react';
+import { CalendarClock, Clock3, Loader2 } from 'lucide-react';
 import type { Grouping } from '../App';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -71,7 +71,7 @@ export function GroupingDeadline({ grouping, isAdmin, now, onSaved }: {
       <div className="registration-deadline flex flex-wrap items-center text-sm text-slate-500 dark:text-slate-400">
         {grouping.deadlineAt && (
           <div className="flex items-start gap-2">
-            {completed ? <Check className="w-4 h-4 mt-0.5 text-emerald-600 dark:text-emerald-400" /> : <Clock3 className="w-4 h-4 mt-0.5 shrink-0" />}
+            {!completed && <Clock3 className="w-4 h-4 mt-0.5 shrink-0" />}
             <div className="space-y-1">
               <p className="registration-deadline-title flex flex-wrap items-baseline">
                 <span className="font-medium text-slate-700 dark:text-slate-300">

@@ -303,10 +303,9 @@ export function GroupingPage({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300" title="Active viewers in this grouping">
-              <UsersRound className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <div className="inline-flex items-center gap-1.5 px-1.5 py-1 text-xs text-slate-400 dark:text-slate-500" title={`${activeViewerCount} active viewer${activeViewerCount === 1 ? '' : 's'} in this grouping`} aria-label={`${activeViewerCount} active viewer${activeViewerCount === 1 ? '' : 's'} in this grouping`}>
+              <UsersRound className="h-3.5 w-3.5" />
               <span className="tabular-nums">{activeViewerCount}</span>
-              <span className="hidden sm:inline">active now</span>
             </div>
             {/* History Button for all users */}
             <GroupHistory

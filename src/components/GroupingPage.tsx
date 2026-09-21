@@ -362,12 +362,11 @@ export function GroupingPage({
 
       {(groups.length > 0 || grouping.deadlineAt) && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-slate-700 dark:text-slate-300">Existing Groups</h2>
+          {isAdmin && undoOrder && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => void undoReorder()} className="gap-2"><Undo2 className="h-4 w-4" />Undo reorder</Button>
             </div>
-            {isAdmin && undoOrder && <Button variant="outline" size="sm" onClick={() => void undoReorder()} className="gap-2"><Undo2 className="h-4 w-4" />Undo reorder</Button>}
-          </div>
+          )}
           {grouping.deadlineAt && <GroupingDeadline key={grouping.id} grouping={grouping} isAdmin={isAdmin} now={now} onSaved={onDeadlineSaved} />}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayGroups.map((group) => (

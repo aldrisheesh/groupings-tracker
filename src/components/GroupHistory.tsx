@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { History, UserPlus, UserMinus, Crown } from "lucide-react";
+import { History, UserPlus, UserMinus, Crown, FilePenLine } from "lucide-react";
 import { GroupHistory } from "../App";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -21,6 +21,10 @@ const getActionIcon = (actionType: string) => {
       return <UserMinus className="w-4 h-4" />;
     case "representative_set":
       return <Crown className="w-4 h-4" />;
+    case "group_details_added":
+    case "group_details_updated":
+    case "group_details_cleared":
+      return <FilePenLine className="w-4 h-4" />;
     default:
       return <History className="w-4 h-4" />;
   }
@@ -34,6 +38,10 @@ const getActionColor = (actionType: string) => {
       return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
     case "representative_set":
       return "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30";
+    case "group_details_added":
+    case "group_details_updated":
+    case "group_details_cleared":
+      return "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30";
     default:
       return "text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/30";
   }
@@ -66,6 +74,7 @@ interface ProcessedHistoryEntry {
   actionType: string;
   groupName: string;
   memberNames: string[];
+  details?: string | null;
   performedBy: string;
   createdAt: string;
 }
@@ -80,7 +89,10 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
       (entry) =>
         entry.actionType === "member_added" ||
         entry.actionType === "member_removed" ||
-        entry.actionType === "representative_set"
+        entry.actionType === "representative_set" ||
+        entry.actionType === "group_details_added" ||
+        entry.actionType === "group_details_updated" ||
+        entry.actionType === "group_details_cleared"
     );
 
     // Group similar actions within 5 seconds by action type and group name
@@ -146,7 +158,8 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
           type: "single",
           actionType: current.actionType,
           groupName: current.groupName,
-          memberNames: current.memberName ? [current.memberName] : [],
+            memberNames: current.memberName ? [current.memberName] : [],
+            details: current.details,
           performedBy: current.performedBy,
           createdAt: current.createdAt,
         });
@@ -220,6 +233,22 @@ export function GroupHistory({ groupingId, history, isAdmin }: GroupHistoryProps
         return (
           <p className="text-slate-900 dark:text-slate-100">
             <span className="font-medium">{entry.memberNames[0]}</span> became representative of "{entry.groupName}"
+          </p>
+        );
+      case "group_details_added":
+      case "group_details_updated":
+        return (
+          <div className="space-y-1">
+            <p className="text-slate-900 dark:text-slate-100">
+              Group details {entry.actionType === "group_details_added" ? "added to" : "updated for"} "{entry.groupName}"
+            </p>
+            {entry.details && <p className="text-sm text-slate-600 dark:text-slate-300">{entry.details}</p>}
+          </div>
+        );
+      case "group_details_cleared":
+        return (
+          <p className="text-slate-900 dark:text-slate-100">
+            Group details cleared for "{entry.groupName}"
           </p>
         );
       default:

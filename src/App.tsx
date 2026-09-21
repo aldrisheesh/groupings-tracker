@@ -50,10 +50,10 @@ export type GroupHistory = {
   id: string;
   groupingId: string;
   groupId: string | null;
-  actionType: 'group_created' | 'group_deleted' | 'member_added' | 'member_removed' | 'group_updated' | 'representative_set' | 'representative_removed';
+  actionType: 'group_created' | 'group_deleted' | 'member_added' | 'member_removed' | 'group_updated' | 'representative_set' | 'representative_removed' | 'group_details_added' | 'group_details_updated' | 'group_details_cleared';
   groupName: string;
   memberName?: string;
-  details?: string;
+  details?: string | null;
   performedBy: 'admin' | 'user' | 'system';
   createdAt: string;
 };
@@ -779,6 +779,25 @@ function App() {
     if (success) {
       const group = groups.find(g => g.id === groupId);
       if (group) {
+        const previousDetails = group.details?.trim() || null;
+        const nextDetails = updatedGroup.details?.trim() || null;
+
+        if (updatedGroup.details !== undefined && nextDetails !== previousDetails) {
+          const detailsAction = nextDetails
+            ? previousDetails ? 'group_details_updated' : 'group_details_added'
+            : 'group_details_cleared';
+
+          await db.logGroupHistory(
+            group.groupingId,
+            groupId,
+            detailsAction,
+            group.name,
+            null,
+            nextDetails,
+            isAdmin ? 'admin' : 'user'
+          );
+        }
+
         // Check if representative was SET (not removed)
         if (updatedGroup.representative !== undefined && updatedGroup.representative !== null) {
           // Representative set
